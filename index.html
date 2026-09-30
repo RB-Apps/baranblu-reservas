@@ -162,6 +162,7 @@
   </div>
   <div class="proto-tag">Baran Blü — cocina de la tierra</div>
 </div>
+
 <script src="baranblu-api-adapter.js"></script>
 <script>
 (function(){
@@ -228,19 +229,9 @@
     if(step === 8){
       return { contacto: true, actual: 1, total: 1 };
     }
-
-    if(state.requiereDeposito === true){
-      return {
-        contacto: false,
-        actual: step === 52 ? 5 : Math.min(step, 6),
-        total: 6
-      };
-    }
-
-    const pasosSinDeposito = {1:1, 2:2, 3:3, 6:4};
     return {
       contacto: false,
-      actual: pasosSinDeposito[step] || Math.min(step, 4),
+      actual: Math.min(step, 4),
       total: 4
     };
   }
@@ -283,7 +274,7 @@
   }
 
   function render(){
-    const screens = {1:screen1,2:screen2,3:screen3,4:screen4,5:screen5,52:screen5b,6:screen6,8:screenAlt};
+    const screens = {1:screen1,2:screen2,3:screen3,4:screen4,8:screenAlt};
     host.innerHTML = (screens[state.step] || screen1)();
     bind();
   }
@@ -353,74 +344,6 @@
   }
 
   function screen4(){
-    return `
-      <div class="screen">
-        <div class="back-link" data-go="3">← Volver</div>
-        <h2 class="screen-title">Resumen de reserva</h2>
-        <div class="avail-card">
-          <div class="avail-row"><span>Fecha</span><span>${state.fechaLabel}</span></div>
-          <div class="avail-row"><span>Hora</span><span>${state.hora}</span></div>
-          <div class="avail-row"><span>Espacio</span><span>${ESPACIOS_INFO[state.espacio].nombre}</span></div>
-          <div class="avail-row"><span>Personas</span><span>${state.personas}</span></div>
-          <div class="avail-row"><span>Depósito</span><span>$${state.personas*10}</span></div>
-        </div>
-        <p class="policy-note">El depósito es 100% consumible y se descuenta de tu cuenta al final. Es necesario para asegurar tu reserva.</p>
-        <div class="field-label">Método de pago</div>
-        <div class="method-row" id="metodoRow">
-          <div class="method-card" data-m="Yappy">
-            <div class="m-title">Yappy</div>
-            <div class="m-sub">Confirmación inmediata</div>
-          </div>
-          <div class="method-card" data-m="ACH">
-            <div class="m-title">ACH</div>
-            <div class="m-sub">Transferencia bancaria</div>
-          </div>
-        </div>
-        ${state.error ? `<div class="error-note">${state.error}</div>` : ""}
-        <div class="cta-bar">
-          <button class="cta-btn" id="pagarBtn" disabled>${state.cargando ? "Reservando…" : "Pagar y reservar"}</button>
-        </div>
-      </div>`;
-  }
-
-  function screen5(){
-    return `
-      <div class="screen" style="text-align:center;padding-top:40px;">
-        <div class="confirm-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><path d="M4 12l5 5L20 6"/></svg>
-        </div>
-        <h2 class="screen-title">Pagando con Yappy</h2>
-        <p class="desc">Te llevamos al Link de Pago de Yappy para completar el depósito de $${state.personas*10}. (Integración real del link pendiente — por ahora simula el pago exitoso.)</p>
-        <div class="cta-bar">
-          <button class="cta-btn" id="confirmarYappyBtn">Simular pago exitoso</button>
-        </div>
-      </div>`;
-  }
-
-  function screen5b(){
-    const d = state.reservaResultado ? state.reservaResultado.datosACH : {};
-    return `
-      <div class="screen" style="text-align:center;padding-top:24px;">
-        <div class="pending-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round"><path d="M12 6v6l4 2"/><circle cx="12" cy="12" r="9"/></svg>
-        </div>
-        <h2 class="screen-title">Tu reserva está apartada</h2>
-        <p class="desc">Transfiere el depósito de $${state.personas*10} a esta cuenta. Tenemos tu cupo retenido por 48 horas.</p>
-        <div class="bank-card" style="text-align:left;">
-          <div class="bank-row"><span>Banco</span><span>${d.banco || "—"}</span></div>
-          <div class="bank-row"><span>Tipo de cuenta</span><span>${d.tipoCuenta || "—"}</span></div>
-          <div class="bank-row"><span>Número de cuenta</span><span>${d.numeroCuenta || "—"}</span></div>
-          <div class="bank-row"><span>Titular</span><span>${d.titular || "—"}</span></div>
-        </div>
-        <a class="wa-btn" href="https://wa.me/${normalizarWhatsapp(d.whatsapp)}?text=${encodeURIComponent('Hola, aquí está mi comprobante para la reserva ' + (state.reservaResultado ? state.reservaResultado.id : ''))}" target="_blank" rel="noopener noreferrer">Enviar comprobante por WhatsApp</a>
-        <p class="policy-note">En cuanto verifiquemos tu pago, te confirmamos por correo.</p>
-        <div class="cta-bar">
-          <button class="cta-btn secondary" data-go="1">Volver al inicio</button>
-        </div>
-      </div>`;
-  }
-
-  function screen6(){
     const sinPago = state.metodoPago === "Sin pago";
     return `
       <div class="screen" style="text-align:center;padding-top:40px;">
@@ -523,13 +446,7 @@
           return;
         }
         state.reservaResultado = resultado;
-        if(state.metodoPago === "Sin pago"){
-          go(6);
-        } else if(state.metodoPago === "ACH"){
-          go(52);
-        } else {
-          go(5);
-        }
+        go(4);
       })
       .withFailureHandler(function(err){
         state.cargando = false;
@@ -550,14 +467,6 @@
       });
   }
 
-  function confirmarYappySimulado(){
-    // TODO real: reemplazar por confirmación real desde el Link de Pago de Yappy
-    // (webhook o confirmación manual del staff), en vez de este botón de simulación.
-    if(state.reservaResultado && state.reservaResultado.id){
-      google.script.run.confirmarPago(state.reservaResultado.id);
-    }
-    go(6);
-  }
 
   function bind(){
     host.querySelectorAll("[data-go]").forEach(el=>{
@@ -629,51 +538,17 @@
           render();
           return;
         }
-        if(state.requiereDeposito === false){
-          state.metodoPago = "Sin pago";
-          enviarReserva();
-        } else {
-          go(4);
-        }
+        state.metodoPago = "Sin pago";
+        enviarReserva();
       });
     }
 
-    // Pantalla 4: método de pago
-    const metodoRow = document.getElementById("metodoRow");
-    if(metodoRow){
-      metodoRow.querySelectorAll(".method-card").forEach(card=>{
-        card.addEventListener("click", ()=>{
-          metodoRow.querySelectorAll(".method-card").forEach(c=>c.classList.remove("selected"));
-          card.classList.add("selected");
-          state.metodoPago = card.dataset.m;
-          document.getElementById("pagarBtn").disabled = false;
-        });
-      });
-    }
-    const pagarBtn = document.getElementById("pagarBtn");
-    if(pagarBtn){
-      pagarBtn.addEventListener("click", enviarReserva);
-    }
-
-    // Pantalla 5: confirmar Yappy simulado
-    const confirmarYappyBtn = document.getElementById("confirmarYappyBtn");
-    if(confirmarYappyBtn){
-      confirmarYappyBtn.addEventListener("click", confirmarYappySimulado);
-    }
   }
 
   go(1);
 
-  google.script.run
-    .withSuccessHandler(function(valor){
-      state.requiereDeposito = !!valor;
-      actualizarIndicador();
-    })
-    .withFailureHandler(function(){
-      state.requiereDeposito = true;
-      actualizarIndicador();
-    }) // asume que sí, por seguridad
-    .getRequiereDeposito();
+  state.requiereDeposito = false;
+  actualizarIndicador();
 })();
 </script>
 </body>
