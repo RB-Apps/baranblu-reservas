@@ -196,7 +196,15 @@
     Terraza: {nombre:"Terraza", sub:"Mesas de 2 y 4"}
   };
 
-  const HORAS = ["1:00pm","1:30pm","2:00pm","2:30pm","3:00pm","3:30pm","4:00pm","4:30pm","5:00pm","5:30pm","6:00pm","6:30pm","7:00pm","7:30pm","8:00pm","8:30pm"];
+  const HORAS = [
+    "1:00pm","1:15pm","1:30pm","1:45pm",
+    "2:00pm","2:15pm","2:30pm","2:45pm","3:00pm",
+    "3:30pm","4:00pm","4:30pm","5:00pm",
+    "5:30pm","5:45pm",
+    "6:00pm","6:15pm","6:30pm","6:45pm",
+    "7:00pm","7:15pm","7:30pm","7:45pm",
+    "8:00pm","8:15pm","8:30pm"
+  ];
 
   function normalizarWhatsapp(numero){
     return String(numero || '').replace(/\D/g, '');
