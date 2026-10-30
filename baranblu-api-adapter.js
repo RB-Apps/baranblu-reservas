@@ -7,10 +7,7 @@
   async function apiGet(action, params = {}) {
     const url = new URL(API_URL);
     url.searchParams.set("api", action);
-
-    Object.entries(params).forEach(([k, v]) => {
-      url.searchParams.set(k, v);
-    });
+    Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
 
     const response = await fetch(url.toString(), {
       method: "GET",
@@ -18,16 +15,9 @@
       cache: "no-store"
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
-
-    if (!json.ok) {
-      throw new Error(json.error || "Error de API");
-    }
-
+    if (!json.ok) throw new Error(json.error || "Error de API");
     return json.data;
   }
 
@@ -38,78 +28,58 @@
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
-      body: JSON.stringify({
-        action,
-        data
-      })
+      body: JSON.stringify({ action, data })
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const json = await response.json();
-
-    if (!json.ok) {
-      throw new Error(json.error || "Error de API");
-    }
-
+    if (!json.ok) throw new Error(json.error || "Error de API");
     return json.data;
   }
 
   function makeRunner() {
     let successHandler = function () {};
-    let failureHandler = function (err) {
-      console.error(err);
-    };
+    let failureHandler = function (err) { console.error(err); };
 
     const runner = {
       withSuccessHandler(fn) {
-        successHandler =
-          typeof fn === "function" ? fn : successHandler;
+        successHandler = typeof fn === "function" ? fn : successHandler;
         return runner;
       },
-
       withFailureHandler(fn) {
-        failureHandler =
-          typeof fn === "function" ? fn : failureHandler;
+        failureHandler = typeof fn === "function" ? fn : failureHandler;
         return runner;
       },
-
       getDisponibilidad(fecha, hora, personas) {
-        apiGet("disponibilidad", {
-          fecha,
-          hora,
-          personas
-        })
+        apiGet("disponibilidad", { fecha, hora, personas })
           .then(successHandler)
           .catch(failureHandler);
       },
-
       getWhatsappNumero() {
         apiGet("whatsapp")
           .then(successHandler)
           .catch(failureHandler);
       },
 
+      getFechasCerradasPublicas() {
+        apiGet("cierres")
+          .then(successHandler)
+          .catch(failureHandler);
+      },
       getRequiereDeposito() {
         apiGet("requiereDeposito")
           .then(successHandler)
           .catch(failureHandler);
       },
-
       crearReserva(datos) {
         apiPost("crearReserva", datos)
           .then(successHandler)
           .catch(failureHandler);
       },
-
       confirmarPago() {
-        failureHandler(
-          new Error(
-            "confirmarPago no está habilitado en la versión pública. Actualmente Baran Blü no requiere depósito."
-          )
-        );
+        failureHandler(new Error(
+          "confirmarPago no está habilitado en la versión pública. Actualmente Baran Blü no requiere depósito."
+        ));
       }
     };
 
@@ -122,7 +92,6 @@
 
   Object.defineProperty(window.google.script, "run", {
     configurable: true,
-
     get() {
       return makeRunner();
     }
