@@ -2,8 +2,7 @@
 // Permite mantener casi intacto el HTML actual que usa google.script.run.
 
 (function () {
-  const API_URL = "https://script.google.com/macros/s/AKfycby0swn4fy9EU8uTLYteaNAEqiEc8Ye6sc5iw9SD9QDSB9vWCd-SrhXam8bbeooIG7b00w/exec";
-
+  const API_URL = "https://script.google.com/macros/s/AKfycbyMIt8vyZIxehHZsZ45BWR60eRDnUWNHIbRZ6cWEt_CMLqqghUaJOXY1WO1I6dCYmrx3A/exec";
   async function apiGet(action, params = {}) {
     const url = new URL(API_URL);
     url.searchParams.set("api", action);
