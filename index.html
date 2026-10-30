@@ -186,7 +186,8 @@
     cargando: false,
     error: null,
     whatsappNumero: null,
-    requiereDeposito: null // null = aún no se sabe, true/false una vez consultado
+    requiereDeposito: null,
+    fechasCerradas: []
   };
 
   const ESPACIOS_INFO = {
@@ -231,7 +232,17 @@
     }
     return dias;
   }
-  const FECHAS = getProximasFechas(6);
+  let FECHAS = getProximasFechas(6);
+
+  function fechaEnCierre_(fecha, cierres){
+    return (cierres || []).some(c => fecha >= c.desde && fecha <= c.hasta);
+  }
+
+  function reconstruirFechasDisponibles_(){
+    FECHAS = getProximasFechas(20)
+      .filter(f => !fechaEnCierre_(f.valor, state.fechasCerradas))
+      .slice(0, 6);
+  }
 
   function getProgresoVisible(step){
     if(step === 8){
@@ -556,6 +567,18 @@
   go(1);
 
   state.requiereDeposito = false;
+
+  google.script.run
+    .withSuccessHandler(function(cierres){
+      state.fechasCerradas = cierres || [];
+      reconstruirFechasDisponibles_();
+      if(state.step === 2) render();
+    })
+    .withFailureHandler(function(){
+      state.fechasCerradas = [];
+    })
+    .getFechasCerradasPublicas();
+
   actualizarIndicador();
 })();
 </script>
