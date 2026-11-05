@@ -472,6 +472,9 @@ function renderRevision(){
         <div><small>Teléfono</small><strong>${esc(state.codigoPais)} ${esc(state.telefono)}</strong></div>
       </div>
       ${msg()}
+      <div class="note" style="margin:14px 0 10px;text-align:center;">
+        Estamos procesando tu reserva. Esto puede tomar unos momentos. Por favor, no cierres ni actualices esta página hasta ver la confirmación.
+      </div>
       <button class="btn action-gap" id="confirmarReserva">${state.cargando?"Reservando...":"Confirmar reserva"}</button>
       <button class="btn secondary" id="editar">Volver y revisar</button>
     </div>
