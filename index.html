@@ -311,8 +311,14 @@ function mostrarIdentidad(r){
       <div class="field"><label>Apellido *</label><input id="apellido" value="${esc(state.apellido)}"></div>
     </div>
     <button class="btn" id="confirmIdentidad">Continuar con la reserva</button>
+    <button class="btn secondary" id="volverTelefono">← Volver / cambiar teléfono</button>
   `;
   document.getElementById("confirmIdentidad").onclick=confirmarIdentidad;
+  document.getElementById("volverTelefono").onclick=()=>{
+    state.nombre=""; state.apellido=""; state.reconocido=false; state.cumpleRegistrado=false; state.error="";
+    renderIdentidad();
+    const tel=document.getElementById("telefono"); if(tel){tel.focus();}
+  };
 }
 
 async function confirmarIdentidad(){
