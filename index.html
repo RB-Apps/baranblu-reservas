@@ -1,3798 +1,462 @@
-/**
-
- * BARAN BLÜ — Sistema de Reservas
-
- * Backend en Google Apps Script
-
- *
-
- * Este archivo va dentro del mismo proyecto de Apps Script que sirve
-
- * tanto la web app del cliente como el panel de staff.
-
- *
-
- * IMPORTANTE: reemplaza SHEET_ID por el ID real de tu Google Sheet
-
- * (está en la URL del Sheet, entre /d/ y /edit).
-
- */
-
-
-
-const SHEET_ID = '1oinPtdDfbDAytbb-b4RJmAzQKXjLQFuZ2ItUmtwTPHg';
-
-
-
-function getSS() {
-
-  return SpreadsheetApp.openById(SHEET_ID);
-
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Baran Blü — Reservas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --baran:#371F2F;
+  --petalo:#695161;
+  --sarigua:#A35243;
+  --platano:#1F2D1D;
+  --bejuco:#B2A991;
+  --yute:#BFB7A3;
+  --paper:#F7F3EA;
+  --paper2:#EEE7D9;
+  --ink:#2C1F27;
+  --ok:#E4ECD9;
+  --danger:#F4DFDB;
 }
-
-
-
-function getSheet(name) {
-
-  return getSS().getSheetByName(name);
-
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:"Bricolage Grotesque",sans-serif;
+  color:var(--ink);
+  background:linear-gradient(180deg,#F0E9DD,#E8E1D4);
 }
-
-
-
-// ============================================================
-
-// CONFIG — lectura de la pestaña "Config"
-
-// ============================================================
-
-
-
-function getConfig() {
-
-  const sheet = getSheet('Config');
-
-  const data = sheet.getDataRange().getValues();
-
-  const config = {};
-
-  for (let i = 0; i < data.length; i++) {
-
-    config[data[i][0]] = data[i][1];
-
-  }
-
-  return config;
-
+.shell{max-width:520px;margin:0 auto;min-height:100vh;background:var(--paper);box-shadow:0 0 60px rgba(55,31,47,.10)}
+.header{
+  background:var(--baran);
+  padding:22px 22px 18px;
+  position:relative;
+  overflow:hidden;
 }
-
-
-
-// ============================================================
-
-// MESAS — lectura del inventario fijo
-
-// ============================================================
-
-
-
-function getMesas() {
-
-  const sheet = getSheet('Mesas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const mesas = [];
-
-  for (let i = 1; i < data.length; i++) {
-
-    mesas.push({
-
-      espacio: data[i][0],
-
-      mesa: data[i][1],
-
-      capacidad: data[i][2]
-
-    });
-
-  }
-
-  return mesas;
-
+.header:after{
+  content:"";position:absolute;right:-30px;bottom:-55px;width:160px;height:160px;
+  border:1px solid rgba(191,183,163,.25);border-radius:50%;
 }
-
-
-
-function getWhatsappNumero() {
-
-  const config = getConfig();
-
-  return config.whatsapp_numero;
-
+.brand-logo{display:block;max-width:230px;width:72%;height:auto;margin:0 auto 8px;mix-blend-mode:normal}
+.header-sub{color:#E9DFD4;text-align:center;font-size:13px;letter-spacing:.03em}
+.main{padding:22px}
+.progress{display:flex;gap:8px;margin-bottom:20px}
+.progress span{height:5px;flex:1;background:#DDD3C4;border-radius:999px}
+.progress span.on{background:var(--sarigua)}
+.step-kicker{font-size:12px;font-weight:700;color:var(--sarigua);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+h1{font-size:30px;line-height:1.05;margin:0 0 8px;color:var(--baran)}
+.lead{margin:0 0 20px;color:var(--petalo);line-height:1.45;font-size:14px}
+.card{background:white;border:1px solid rgba(55,31,47,.10);border-radius:18px;padding:16px;margin-bottom:14px}
+.field{margin-bottom:14px}
+label{display:block;font-size:13px;font-weight:700;margin-bottom:7px;color:var(--baran)}
+input,select,textarea{
+  width:100%;padding:13px 14px;border:1px solid #D8CEBE;border-radius:12px;
+  background:#fff;font:inherit;color:var(--ink);outline:none;
 }
-
-
-
-function getRequiereDeposito() {
-
-  const config = getConfig();
-
-  const valor = (config.requiere_deposito || '').toString().trim().toLowerCase();
-
-  return valor === 'si' || valor === 'sí';
-
+input:focus,select:focus,textarea:focus{border-color:var(--platano);box-shadow:0 0 0 3px rgba(31,45,29,.08)}
+textarea{min-height:84px;resize:vertical}
+.phone-grid{display:grid;grid-template-columns:110px 1fr;gap:10px}
+.name-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.bday-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{
+  border:1px solid #D7CCBC;background:#fff;padding:10px 13px;border-radius:999px;
+  cursor:pointer;font:inherit;font-size:13px;font-weight:600
 }
-
-
-// ============================================================
-// SEGURIDAD PANEL STAFF — LOGIN + ROLES
-// Roles: STAFF / ADMIN
-// ============================================================
-
-const STAFF_USUARIOS_SHEET = 'UsuariosStaff';
-const STAFF_SESION_HORAS = 8;
-
-function hashStaff_(texto) {
-  const bytes = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.SHA_256,
-    String(texto),
-    Utilities.Charset.UTF_8
-  );
-  return bytes.map(b => {
-    const v = b < 0 ? b + 256 : b;
-    return ('0' + v.toString(16)).slice(-2);
-  }).join('');
+.pill.active{background:var(--platano);color:#fff;border-color:var(--platano)}
+.pill.disabled{opacity:.35;cursor:not-allowed}
+.spaces{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.space{
+  border:1px solid #D7CCBC;border-radius:14px;padding:14px;cursor:pointer;background:#fff;
 }
-
-function asegurarHojaUsuariosStaff_() {
-  const ss = getSS();
-  let sheet = ss.getSheetByName(STAFF_USUARIOS_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(STAFF_USUARIOS_SHEET);
-    sheet.appendRow(['Usuario','Nombre','Rol','Salt','Hash','Activo','Debe cambiar clave','Último acceso']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
+.space.active{border:2px solid var(--platano);background:#F1F4EA}
+.space.off{opacity:.35;pointer-events:none}
+.space strong{display:block;color:var(--baran);margin-bottom:3px}
+.space small{color:var(--petalo)}
+.btn{
+  width:100%;border:0;border-radius:13px;padding:15px 16px;
+  background:var(--platano);color:#fff;font:inherit;font-weight:700;cursor:pointer;
 }
-
-function crearCredencialStaff_(sheet, usuario, nombre, rol, claveTemporal) {
-  const salt = Utilities.getUuid().replace(/-/g, '');
-  const hash = hashStaff_(salt + '|' + claveTemporal);
-  sheet.appendRow([usuario,nombre,rol,salt,hash,'Sí','Sí','']);
+.btn.secondary{background:transparent;color:var(--baran);border:1px solid #CDBFAE;margin-top:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.note{font-size:12px;line-height:1.45;color:var(--petalo);margin-top:8px}
+.alert{padding:11px 12px;border-radius:10px;font-size:13px;margin:10px 0}
+.alert.ok{background:var(--ok);color:#31472C}
+.alert.err{background:var(--danger);color:#8E382E}
+.welcome{
+  background:linear-gradient(135deg,#F2E9E3,#F7F3EA);
+  border:1px solid rgba(163,82,67,.20);padding:14px;border-radius:14px;margin:12px 0;
 }
-
-function configurarSeguridadStaffInicial() {
-  const sheet = asegurarHojaUsuariosStaff_();
-  if (sheet.getLastRow() > 1) {
-    return { exito:false, mensaje:'UsuariosStaff ya contiene usuarios. No se crearon credenciales nuevas.' };
-  }
-
-  const claveChef = 'BB-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
-  const claveAdmin = 'BB-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
-  const claveStaff = 'BB-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
-
-  crearCredencialStaff_(sheet, 'chef', 'Chef', 'ADMIN', claveChef);
-  crearCredencialStaff_(sheet, 'administracion', 'Administración', 'ADMIN', claveAdmin);
-  crearCredencialStaff_(sheet, 'staff', 'Staff', 'STAFF', claveStaff);
-
-  Logger.log('=== CREDENCIALES TEMPORALES BARAN BLÜ ===');
-  Logger.log('Usuario: chef');
-  Logger.log('Clave temporal: ' + claveChef);
-  Logger.log('Usuario: administracion');
-  Logger.log('Clave temporal: ' + claveAdmin);
-  Logger.log('Usuario: staff');
-  Logger.log('Clave temporal: ' + claveStaff);
-  Logger.log('Guárdalas de forma segura. No quedan almacenadas en texto plano.');
-  Logger.log('==========================================');
-
-  return { exito:true, mensaje:'Seguridad inicial creada. Revisa el registro de ejecución.' };
-}
-
-
-function crearUsuarioStaffCompartido() {
-  const existente = buscarUsuarioStaff_('staff');
-  if (existente) {
-    return { exito: false, mensaje: 'El usuario staff ya existe.' };
-  }
-
-  const sheet = asegurarHojaUsuariosStaff_();
-  const claveStaff = 'BB-' + Utilities.getUuid().replace(/-/g, '').slice(0, 14);
-
-  crearCredencialStaff_(sheet, 'staff', 'Staff', 'STAFF', claveStaff);
-
-  Logger.log('=== CREDENCIAL TEMPORAL STAFF BARAN BLÜ ===');
-  Logger.log('Usuario: staff');
-  Logger.log('Clave temporal: ' + claveStaff);
-  Logger.log('Guárdala de forma segura. No queda almacenada en texto plano.');
-  Logger.log('===========================================');
-
-  return {
-    exito: true,
-    mensaje: 'Usuario staff creado. Revisa el registro de ejecución para ver la clave temporal.'
-  };
-}
-
-function cambiarClavePropiaStaff(token, claveActual, claveNueva) {
-  const sesion = requerirSesionStaff_(token);
-
-  if (sesion.rol !== 'ADMIN') {
-    return {
-      exito: false,
-      mensaje: 'El usuario compartido STAFF no puede cambiar su propia contraseña.'
-    };
-  }
-
-  return cambiarClaveStaff(token, claveActual, claveNueva);
-}
-
-function cambiarClaveUsuarioStaffPorAdmin(token, usuarioObjetivo, claveNueva) {
-  const sesion = requerirSesionStaff_(token, 'ADMIN');
-  const objetivo = buscarUsuarioStaff_(usuarioObjetivo);
-
-  if (!objetivo || !objetivo.activo) {
-    return { exito: false, mensaje: 'Usuario no encontrado o inactivo.' };
-  }
-
-  if (String(claveNueva || '').length < 10) {
-    return { exito: false, mensaje: 'La nueva contraseña debe tener al menos 10 caracteres.' };
-  }
-
-  if (objetivo.rol !== 'STAFF') {
-    return {
-      exito: false,
-      mensaje: 'Esta opción solo permite cambiar la contraseña del usuario compartido STAFF.'
-    };
-  }
-
-  const nuevoSalt = Utilities.getUuid().replace(/-/g, '');
-  const nuevoHash = hashStaff_(nuevoSalt + '|' + claveNueva);
-
-  const sheet = asegurarHojaUsuariosStaff_();
-  sheet.getRange(objetivo.fila, 4).setValue(nuevoSalt);
-  sheet.getRange(objetivo.fila, 5).setValue(nuevoHash);
-  sheet.getRange(objetivo.fila, 7).setValue('No');
-
-  return {
-    exito: true,
-    mensaje: 'Contraseña del usuario staff actualizada correctamente.'
-  };
-}
-
-function getUsuariosStaffBasicos(token) {
-  requerirSesionStaff_(token, 'ADMIN');
-
-  const sheet = asegurarHojaUsuariosStaff_();
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  return data.slice(1).map(row => ({
-    usuario: String(row[idx['Usuario']] || ''),
-    nombre: String(row[idx['Nombre']] || ''),
-    rol: String(row[idx['Rol']] || ''),
-    activo: String(row[idx['Activo']] || '').trim().toLowerCase() === 'sí' ||
-            String(row[idx['Activo']] || '').trim().toLowerCase() === 'si' ||
-            row[idx['Activo']] === true
-  }));
-}
-
-
-
-function buscarUsuarioStaff_(usuario) {
-  const sheet = asegurarHojaUsuariosStaff_();
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return null;
-
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-  const buscado = String(usuario || '').trim().toLowerCase();
-
-  for (let i=1;i<data.length;i++) {
-    const row = data[i];
-    if (String(row[idx['Usuario']] || '').trim().toLowerCase() === buscado) {
-      const activoRaw = String(row[idx['Activo']] || '').trim().toLowerCase();
-      const cambioRaw = String(row[idx['Debe cambiar clave']] || '').trim().toLowerCase();
-      return {
-        fila:i+1,
-        usuario:String(row[idx['Usuario']] || '').trim(),
-        nombre:String(row[idx['Nombre']] || '').trim(),
-        rol:String(row[idx['Rol']] || '').trim().toUpperCase(),
-        salt:String(row[idx['Salt']] || ''),
-        hash:String(row[idx['Hash']] || ''),
-        activo: activoRaw === 'sí' || activoRaw === 'si' || row[idx['Activo']] === true,
-        debeCambiarClave: cambioRaw === 'sí' || cambioRaw === 'si' || row[idx['Debe cambiar clave']] === true
-      };
-    }
-  }
-  return null;
-}
-
-function generarTokenStaff_() {
-  return Utilities.getUuid().replace(/-/g,'') + Utilities.getUuid().replace(/-/g,'');
-}
-
-function guardarSesionStaff_(token, sesion) {
-  CacheService.getScriptCache().put(
-    'STAFF_SESSION_' + token,
-    JSON.stringify(sesion),
-    STAFF_SESION_HORAS * 60 * 60
-  );
-}
-
-function leerSesionStaff_(token) {
-  if (!token) return null;
-  const raw = CacheService.getScriptCache().get('STAFF_SESSION_' + token);
-  if (!raw) return null;
-  try { return JSON.parse(raw); } catch(e) { return null; }
-}
-
-function requerirSesionStaff_(token, rolNecesario) {
-  const sesion = leerSesionStaff_(token);
-  if (!sesion) throw new Error('SESIÓN_EXPIRADA');
-  if (rolNecesario === 'ADMIN' && sesion.rol !== 'ADMIN') throw new Error('ACCESO_DENEGADO');
-  return sesion;
-}
-
-function loginStaff(usuario, clave) {
-  const user = buscarUsuarioStaff_(usuario);
-  if (!user || !user.activo) return {exito:false,mensaje:'Usuario o contraseña incorrectos.'};
-
-  const hashIngresado = hashStaff_(user.salt + '|' + String(clave || ''));
-  if (hashIngresado !== user.hash) return {exito:false,mensaje:'Usuario o contraseña incorrectos.'};
-
-  const token = generarTokenStaff_();
-  const sesion = {
-    usuario:user.usuario,
-    nombre:user.nombre,
-    rol:user.rol,
-    debeCambiarClave:user.debeCambiarClave,
-    creada:new Date().toISOString()
-  };
-  guardarSesionStaff_(token, sesion);
-  asegurarHojaUsuariosStaff_().getRange(user.fila,8).setValue(new Date());
-
-  return {exito:true,token:token,usuario:user.usuario,nombre:user.nombre,rol:user.rol,debeCambiarClave:user.debeCambiarClave};
-}
-
-function getSesionStaff(token) {
-  const sesion = leerSesionStaff_(token);
-  if (!sesion) return {exito:false};
-  return {exito:true,usuario:sesion.usuario,nombre:sesion.nombre,rol:sesion.rol,debeCambiarClave:sesion.debeCambiarClave};
-}
-
-function logoutStaff(token) {
-  if (token) CacheService.getScriptCache().remove('STAFF_SESSION_' + token);
-  return {exito:true};
-}
-
-function cambiarClaveStaff(token, claveActual, claveNueva) {
-  const sesion = requerirSesionStaff_(token);
-  const user = buscarUsuarioStaff_(sesion.usuario);
-  if (!user || !user.activo) return {exito:false,mensaje:'Usuario no disponible.'};
-  if (String(claveNueva || '').length < 10) return {exito:false,mensaje:'La nueva contraseña debe tener al menos 10 caracteres.'};
-
-  const actual = hashStaff_(user.salt + '|' + String(claveActual || ''));
-  if (actual !== user.hash) return {exito:false,mensaje:'La contraseña actual no es correcta.'};
-
-  const nuevoSalt = Utilities.getUuid().replace(/-/g,'');
-  const nuevoHash = hashStaff_(nuevoSalt + '|' + claveNueva);
-  const sheet = asegurarHojaUsuariosStaff_();
-  sheet.getRange(user.fila,4).setValue(nuevoSalt);
-  sheet.getRange(user.fila,5).setValue(nuevoHash);
-  sheet.getRange(user.fila,7).setValue('No');
-
-  guardarSesionStaff_(token, Object.assign({}, sesion, {debeCambiarClave:false}));
-  return {exito:true};
-}
-
-// ============================================================
-// CIERRES DEL RESTAURANTE — SOLO ADMIN
-// ============================================================
-
-const CIERRES_SHEET = 'Cierres';
-
-function asegurarHojaCierres_() {
-  const ss = getSS();
-  let sheet = ss.getSheetByName(CIERRES_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(CIERRES_SHEET);
-    sheet.appendRow(['ID','Desde','Hasta','Motivo','Activo','Creado por','Creado']);
-    sheet.setFrozenRows(1);
-  }
-  return sheet;
-}
-
-function estaFechaCerrada_(fecha) {
-  const sheet = getSS().getSheetByName(CIERRES_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return false;
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-  const buscada = normalizarFecha(fecha);
-
-  for (let i=1;i<data.length;i++) {
-    const row = data[i];
-    const activo = String(row[idx['Activo']] || '').trim().toLowerCase();
-    if (!(activo === 'sí' || activo === 'si' || row[idx['Activo']] === true)) continue;
-
-    const desde = normalizarFecha(row[idx['Desde']]);
-    const hasta = normalizarFecha(row[idx['Hasta']]);
-    if (buscada >= desde && buscada <= hasta) return true;
-  }
-  return false;
-}
-
-function contarReservasActivasEnRango_(desde, hasta) {
-  const sheet = getSheet('Reservas');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  const estados = ['Pendiente de pago','Confirmada','Completada'];
-  let reservas = 0, personas = 0;
-
-  for (let i=1;i<data.length;i++) {
-    const row = data[i];
-    const fecha = normalizarFecha(row[idx['Fecha']]);
-    if (fecha >= desde && fecha <= hasta && estados.indexOf(row[idx['Estado']]) !== -1) {
-      reservas++;
-      personas += Number(row[idx['Personas']] || 0);
-    }
-  }
-  return {reservas:reservas,personas:personas};
-}
-
-function previsualizarCierre(token, desde, hasta) {
-  requerirSesionStaff_(token,'ADMIN');
-  const d = normalizarFecha(desde);
-  const h = normalizarFecha(hasta || desde);
-  if (!d || !h || h < d) return {exito:false,mensaje:'Rango de fechas inválido.'};
-  const existentes = contarReservasActivasEnRango_(d,h);
-  return {exito:true,desde:d,hasta:h,reservas:existentes.reservas,personas:existentes.personas};
-}
-
-function bloquearFechas(token, desde, hasta, motivo) {
-  const sesion = requerirSesionStaff_(token,'ADMIN');
-  const d = normalizarFecha(desde);
-  const h = normalizarFecha(hasta || desde);
-  if (!d || !h || h < d) return {exito:false,mensaje:'Rango de fechas inválido.'};
-
-  const id = 'CIE-' + Utilities.formatDate(new Date(),Session.getScriptTimeZone(),'yyyyMMddHHmmss');
-  asegurarHojaCierres_().appendRow([id,d,h,String(motivo || '').trim(),'Sí',sesion.usuario,new Date()]);
-  return {exito:true,id:id,reservasExistentes:contarReservasActivasEnRango_(d,h)};
-}
-
-function getCierresStaff(token) {
-  requerirSesionStaff_(token,'ADMIN');
-  const sheet = asegurarHojaCierres_();
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return [];
-
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  return data.slice(1).filter(row => {
-    const activo = String(row[idx['Activo']] || '').trim().toLowerCase();
-    return activo === 'sí' || activo === 'si' || row[idx['Activo']] === true;
-  }).map(row => ({
-    id:row[idx['ID']],
-    desde:normalizarFecha(row[idx['Desde']]),
-    hasta:normalizarFecha(row[idx['Hasta']]),
-    motivo:row[idx['Motivo']] || '',
-    creadoPor:row[idx['Creado por']] || ''
-  })).reverse();
-}
-
-function desbloquearCierre(token, idCierre) {
-  requerirSesionStaff_(token,'ADMIN');
-  const sheet = asegurarHojaCierres_();
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  for (let i=1;i<data.length;i++) {
-    if (String(data[i][idx['ID']]) === String(idCierre)) {
-      sheet.getRange(i+1,idx['Activo']+1).setValue('No');
-      return {exito:true};
-    }
-  }
-  return {exito:false,mensaje:'Cierre no encontrado.'};
-}
-
-function getFechasCerradasPublicas() {
-  const sheet = getSS().getSheetByName(CIERRES_SHEET);
-  if (!sheet || sheet.getLastRow() < 2) return [];
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0], idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  return data.slice(1).filter(row => {
-    const activo = String(row[idx['Activo']] || '').trim().toLowerCase();
-    return activo === 'sí' || activo === 'si' || row[idx['Activo']] === true;
-  }).map(row => ({
-    desde:normalizarFecha(row[idx['Desde']]),
-    hasta:normalizarFecha(row[idx['Hasta']])
-  }));
-}
-
-function pruebaPresionRolesYCierres() {
-  const casos = [
-    ['STAFF no es ADMIN','STAFF',false],
-    ['ADMIN sí es ADMIN','ADMIN',true],
-    ['rol vacío no es ADMIN','',false]
-  ];
-  const rangos = [
-    ['dentro','2026-12-25','2026-12-24','2026-12-26',true],
-    ['inicio','2026-12-24','2026-12-24','2026-12-26',true],
-    ['fin','2026-12-26','2026-12-24','2026-12-26',true],
-    ['antes','2026-12-23','2026-12-24','2026-12-26',false],
-    ['después','2026-12-27','2026-12-24','2026-12-26',false]
-  ];
-  let fallos = 0;
-  casos.forEach(c => {
-    const obtenido = c[1] === 'ADMIN';
-    if (obtenido !== c[2]) fallos++;
-    Logger.log('ROL | %s | %s',c[0],obtenido === c[2] ? 'PASS' : 'FAIL');
+.checkrow{display:flex;gap:10px;align-items:flex-start;margin:12px 0}
+.checkrow input{width:auto;margin-top:3px}
+.checkrow label{font-weight:500;color:var(--ink);margin:0;line-height:1.4}
+.link{color:var(--sarigua);text-decoration:underline;cursor:pointer;font-weight:600}
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.summary div{background:var(--paper2);border-radius:12px;padding:12px}
+.summary small{display:block;color:var(--petalo);margin-bottom:3px}
+.summary strong{color:var(--baran)}
+.hidden{display:none!important}
+.mini{font-size:11px;color:var(--petalo)}
+.privacy-box{background:#F2EEE6;padding:12px;border-radius:12px;font-size:12px;line-height:1.5;color:#5F5059}
+.wa{margin-top:14px;text-align:center;font-size:13px;color:var(--petalo)}
+.success{text-align:center;padding:18px 0}
+.success .icon{width:64px;height:64px;border-radius:50%;background:var(--platano);color:white;display:grid;place-items:center;margin:0 auto 14px;font-size:30px}
+@media(max-width:410px){.name-grid,.spaces{grid-template-columns:1fr}.phone-grid{grid-template-columns:96px 1fr}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="header">
+    <img src="baranblu-logo.png" alt="Baran Blü" class="brand-logo">
+    <div class="header-sub">Cocina de la Tierra</div>
+  </header>
+  <main class="main">
+    <div class="progress" id="progress"><span></span><span></span><span></span><span></span></div>
+    <div id="app"></div>
+  </main>
+</div>
+
+<script src="baranblu-api-adapter.js"></script>
+<script>
+(()=>{
+const app=document.getElementById("app");
+const prog=[...document.querySelectorAll("#progress span")];
+
+const state={
+  step:1,codigoPais:"+507",telefono:"",
+  nombre:"",apellido:"",reconocido:false,cumpleRegistrado:false,
+  personas:null,fecha:"",fechaLabel:"",hora:"",espacio:"",
+  correo:"",cumpleDia:"",cumpleMes:"",
+  alergias:"",guardarAlergias:false,ocasion:"",observaciones:"",
+  consentimientoMarketing:false,privacidadAceptada:false,
+  solicitarCumple:false,nuevoCumpleDia:"",nuevoCumpleMes:"",
+  whatsapp:"",cierres:[],disponibilidad:{},resultado:null,error:"",cargando:false
+};
+
+const HORAS=["1:00pm","1:15pm","1:30pm","1:45pm","2:00pm","2:15pm","2:30pm","2:45pm","3:00pm","3:30pm","4:00pm","4:30pm","5:00pm","5:30pm","5:45pm","6:00pm","6:15pm","6:30pm","6:45pm","7:00pm","7:15pm","7:30pm","7:45pm","8:00pm","8:15pm","8:30pm"];
+const ESPACIOS={
+  Sala:["Sala","Mesas de 2 y 4"],
+  Terraza:["Terraza","Mesas de 2 y 4"],
+  Booth:["Booth","Hasta 8 puestos compartidos"],
+  Bar:["Bar","Puestos en barra"]
+};
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function api(method,args=[]){
+  return new Promise((resolve,reject)=>{
+    let r=google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+    r[method](...args);
   });
-  rangos.forEach(c => {
-    const obtenido = c[1] >= c[2] && c[1] <= c[3];
-    if (obtenido !== c[4]) fallos++;
-    Logger.log('CIERRE | %s | %s',c[0],obtenido === c[4] ? 'PASS' : 'FAIL');
-  });
-  Logger.log(fallos === 0 ? 'PRUEBA ROLES + CIERRES: PASS' : 'PRUEBA ROLES + CIERRES: FAIL (' + fallos + ')');
-  return {exito:fallos===0,fallos:fallos,totalCasos:casos.length+rangos.length};
 }
-
-
-function pruebaPresionClavesStaff() {
-  const casos = [
-    ['ADMIN puede cambiar propia', 'ADMIN', true],
-    ['STAFF no puede cambiar propia', 'STAFF', false],
-    ['ADMIN puede administrar STAFF', 'STAFF', true],
-    ['ADMIN no usa esta opción sobre ADMIN', 'ADMIN', false],
-    ['clave corta rechazada', 9, false],
-    ['clave de 10 aceptada', 10, true]
-  ];
-
-  let fallos = 0;
-
-  const resultados = [
-    casos[0][1] === 'ADMIN',
-    casos[1][1] === 'ADMIN',
-    casos[2][1] === 'STAFF',
-    casos[3][1] === 'STAFF',
-    casos[4][1] >= 10,
-    casos[5][1] >= 10
-  ];
-
-  casos.forEach((c, i) => {
-    const ok = resultados[i] === c[2];
-    if (!ok) fallos++;
-    Logger.log('CLAVES | %s | %s', c[0], ok ? 'PASS' : 'FAIL');
-  });
-
-  Logger.log(
-    fallos === 0
-      ? 'PRUEBA CLAVES STAFF: PASS'
-      : 'PRUEBA CLAVES STAFF: FAIL (' + fallos + ')'
-  );
-
-  return { exito: fallos === 0, fallos: fallos, totalCasos: casos.length };
+function setStep(n){state.step=n;prog.forEach((x,i)=>x.classList.toggle("on",i<n));render();window.scrollTo({top:0,behavior:"smooth"});}
+function iso(d){return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function fechaCerrada(v){
+  return state.cierres.some(c=>v>=String(c.desde||"") && v<=String(c.hasta||""));
 }
-
-
-
-
-
-
-
-// ============================================================
-
-// DISPONIBILIDAD
-
-// ============================================================
-
-
-
-/**
-
- * Devuelve espacios disponibles para una fecha/hora/cantidad de personas dada.
-
- * personas: número (1-6). Grupos 7+ no pasan por aquí.
-
- */
-
-function getDisponibilidad(fecha, hora, personas) {
-  const espaciosCierre = ['Bar', 'Booth', 'Sala', 'Terraza'];
-  if (estaFechaCerrada_(fecha)) {
-    const cerrado = {};
-    espaciosCierre.forEach(espacio => cerrado[espacio] = false);
-    return cerrado;
+function proximasFechas(n=6){
+  const out=[], dias=["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"], meses=["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  const d=new Date(); d.setHours(12,0,0,0);
+  for(let k=0;k<35 && out.length<n;k++){
+    const dow=d.getDay(), v=iso(d);
+    if(dow>=2 && dow<=6 && !fechaCerrada(v)) out.push({v,label:`${dias[dow]} ${d.getDate()} ${meses[d.getMonth()]}`});
+    d.setDate(d.getDate()+1);
   }
-
-
-  const espacios = ['Bar', 'Booth', 'Sala', 'Terraza'];
-  const resultado = {};
-  const cantidad = Number(personas || 0);
-
-  // Regla de llegadas: martes a sábado, máximo 12 personas por
-  // bloque de 15 minutos en 1:00–3:00 pm y 5:30–8:30 pm.
-  const cupoLlegadas = validarCupoLlegadas_(fecha, hora, cantidad);
-
-  if (!cupoLlegadas.disponible) {
-    espacios.forEach(espacio => resultado[espacio] = false);
-    return resultado;
-  }
-
-  espacios.forEach(espacio => {
-    resultado[espacio] = asignarMesa(espacio, cantidad, fecha, hora) !== null;
-  });
-
-  return resultado;
-
+  return out;
 }
-
-
-
-function normalizarFecha(valor) {
-
-  // Si ya viene como texto 'yyyy-MM-dd' (como guarda este Sheet), se usa tal cual
-
-  // para evitar que la conversión a Date desfase el día por huso horario.
-
-  if (typeof valor === 'string') {
-
-    return valor.trim();
-
-  }
-
-  return Utilities.formatDate(new Date(valor), Session.getScriptTimeZone(), 'yyyy-MM-dd');
-
+function err(e){state.error=(e&&e.message)||String(e||"Ocurrió un error.");state.cargando=false;render();}
+function msg(){
+  return state.error?`<div class="alert err">${esc(state.error)}</div>`:"";
 }
-
-
-
-const DURACION_RESERVA_MINUTOS = 90;
-
-
-// ============================================================
-// CONTROL DE LLEGADAS — máximo 12 personas por bloque de 15 min
-// Martes a sábado:
-//   Almuerzo: 1:00 pm a 3:00 pm
-//   Noche:    5:30 pm a 8:30 pm
-// ============================================================
-
-const LIMITE_PERSONAS_BLOQUE_PICO = 12;
-
-function diaSemanaISO_(fecha) {
-  const iso = normalizarFecha(fecha);
-  const partes = iso.split('-').map(Number);
-
-  if (partes.length !== 3 || partes.some(n => !Number.isFinite(n))) {
-    throw new Error('Fecha no reconocida: ' + fecha);
-  }
-
-  // Mediodía local evita desplazamientos por zona horaria.
-  return new Date(partes[0], partes[1] - 1, partes[2], 12, 0, 0).getDay();
-}
-
-function esDiaControlLlegadas_(fecha) {
-  const dia = diaSemanaISO_(fecha);
-  return dia >= 2 && dia <= 6; // martes(2) a sábado(6)
-}
-
-function esHorarioControlLlegadas_(fecha, hora) {
-  if (!esDiaControlLlegadas_(fecha)) return false;
-
-  const minutos = horaAMinutos_(hora);
-  if (minutos === null) return false;
-
-  const almuerzo = minutos >= (13 * 60) && minutos <= (15 * 60);
-  const noche = minutos >= (17 * 60 + 30) && minutos <= (20 * 60 + 30);
-
-  return almuerzo || noche;
-}
-
-function esHoraPublicaPermitida_(fecha, hora) {
-  if (!esDiaControlLlegadas_(fecha)) return false;
-
-  const minutos = horaAMinutos_(hora);
-  if (minutos === null) return false;
-
-  // 1:00–3:00 pm: cada 15 minutos, incluyendo 3:00.
-  if (minutos >= 13 * 60 && minutos <= 15 * 60) {
-    return minutos % 15 === 0;
-  }
-
-  // 3:30–5:00 pm: se mantiene cada 30 minutos.
-  if (minutos >= (15 * 60 + 30) && minutos <= 17 * 60) {
-    return minutos % 30 === 0;
-  }
-
-  // 5:30–8:30 pm: cada 15 minutos, incluyendo 8:30.
-  if (minutos >= (17 * 60 + 30) && minutos <= (20 * 60 + 30)) {
-    return minutos % 15 === 0;
-  }
-
-  return false;
-}
-
-function estadosQueCuentanLlegada_() {
-  return ['Pendiente de pago', 'Confirmada', 'Completada'];
-}
-
-function personasReservadasEnBloque_(fecha, hora) {
-  if (!esHorarioControlLlegadas_(fecha, hora)) return 0;
-
-  const sheet = getSheet('Reservas');
-  const data = sheet.getDataRange().getValues();
-  if (!data || data.length < 2) return 0;
-
-  const headers = data[0];
-  const idx = {};
-  headers.forEach((h, i) => idx[h] = i);
-
-  const fechaBuscada = normalizarFecha(fecha);
-  const horaBuscada = horaAMinutos_(hora);
-  const estadosValidos = estadosQueCuentanLlegada_();
-
-  let total = 0;
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const estado = row[idx['Estado']];
-
-    if (estadosValidos.indexOf(estado) === -1) continue;
-    if (normalizarFecha(row[idx['Fecha']]) !== fechaBuscada) continue;
-
-    const horaFila = horaAMinutos_(row[idx['Hora']]);
-    if (horaFila !== horaBuscada) continue;
-
-    total += Number(row[idx['Personas']] || 0);
-  }
-
-  return total;
-}
-
-function puedeAceptarPersonasEnBloque_(ocupadas, solicitadas) {
-  const actuales = Number(ocupadas || 0);
-  const nuevas = Number(solicitadas || 0);
-
-  return nuevas > 0 &&
-    actuales >= 0 &&
-    (actuales + nuevas) <= LIMITE_PERSONAS_BLOQUE_PICO;
-}
-
-function validarCupoLlegadas_(fecha, hora, personas) {
-  const solicitadas = Number(personas || 0);
-
-  if (!esHorarioControlLlegadas_(fecha, hora)) {
-    return {
-      aplica: false,
-      disponible: true,
-      ocupadas: 0,
-      solicitadas: solicitadas,
-      limite: LIMITE_PERSONAS_BLOQUE_PICO
-    };
-  }
-
-  const ocupadas = personasReservadasEnBloque_(fecha, hora);
-
-  return {
-    aplica: true,
-    disponible: puedeAceptarPersonasEnBloque_(ocupadas, solicitadas),
-    ocupadas: ocupadas,
-    solicitadas: solicitadas,
-    limite: LIMITE_PERSONAS_BLOQUE_PICO
-  };
-}
-
-
-
-function horaAMinutos_(valor) {
-
-  if (valor === null || valor === undefined) return null;
-
-
-
-  if (Object.prototype.toString.call(valor) === '[object Date]' && !isNaN(valor)) {
-
-    return valor.getHours() * 60 + valor.getMinutes();
-
-  }
-
-
-
-  let texto = String(valor).trim().toLowerCase();
-
-  if (!texto) return null;
-
-
-
-  texto = texto.replace(/\\./g, '').replace(/\s+/g, '');
-
-
-
-  const match = texto.match(/^(\d{1,2})(?::(\d{2}))?(am|pm)?$/);
-
-  if (!match) {
-
-    throw new Error('Formato de hora no reconocido: ' + valor);
-
-  }
-
-
-
-  let horas = Number(match[1]);
-
-  const minutos = Number(match[2] || 0);
-
-  const sufijo = match[3] || '';
-
-
-
-  if (minutos < 0 || minutos > 59) {
-
-    throw new Error('Minutos inválidos en hora: ' + valor);
-
-  }
-
-
-
-  if (sufijo) {
-
-    if (horas < 1 || horas > 12) {
-
-      throw new Error('Hora inválida en formato 12h: ' + valor);
-
-    }
-
-    if (sufijo === 'am') {
-
-      if (horas === 12) horas = 0;
-
-    } else if (sufijo === 'pm') {
-
-      if (horas !== 12) horas += 12;
-
-    }
-
-  } else {
-
-    if (horas < 0 || horas > 23) {
-
-      throw new Error('Hora inválida en formato 24h: ' + valor);
-
-    }
-
-  }
-
-
-
-  return horas * 60 + minutos;
-
-}
-
-
-
-function intervalosSeSolapan_(inicioA, inicioB, duracionMinutos) {
-
-  const finA = inicioA + duracionMinutos;
-
-  const finB = inicioB + duracionMinutos;
-
-  return inicioA < finB && inicioB < finA;
-
-}
-
-
-
-function getReservasActivas(fecha, hora) {
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  if (!data || data.length === 0) return [];
-
-
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  const estadosQueOcupanMesa = ['Pendiente de pago', 'Confirmada', 'Completada'];
-
-  const activas = [];
-
-
-
-  const fechaBuscada = normalizarFecha(fecha);
-
-  const inicioBuscado = horaAMinutos_(hora);
-
-
-
-  if (inicioBuscado === null) {
-
-    throw new Error('Hora de búsqueda inválida: ' + hora);
-
-  }
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    const row = data[i];
-
-
-
-    const estado = row[idx['Estado']];
-
-    if (estadosQueOcupanMesa.indexOf(estado) === -1) continue;
-
-
-
-    const rowFecha = normalizarFecha(row[idx['Fecha']]);
-
-    if (rowFecha !== fechaBuscada) continue;
-
-
-
-    const inicioExistente = horaAMinutos_(row[idx['Hora']]);
-
-    if (inicioExistente === null) continue;
-
-
-
-    if (intervalosSeSolapan_(inicioBuscado, inicioExistente, DURACION_RESERVA_MINUTOS)) {
-
-      activas.push({
-
-        id: row[idx['ID']],
-
-        espacio: row[idx['Espacio']],
-
-        mesaAsignada: row[idx['Mesa asignada']],
-
-        personas: Number(row[idx['Personas']] || 0),
-
-        hora: row[idx['Hora']],
-
-        estado: estado
-
-      });
-
-    }
-
-  }
-
-
-
-  return activas;
-
-}
-
-
-
-function pruebaPresionBloqueo90Min_() {
-
-  const casos = [
-
-    ['7:00pm', '7:00pm',  true],
-
-    ['7:00pm', '7:30pm',  true],
-
-    ['7:00pm', '8:00pm',  true],
-
-    ['7:00pm', '8:29pm',  true],
-
-    ['7:00pm', '8:30pm',  false],
-
-    ['7:00pm', '9:00pm',  false],
-
-    ['8:30pm', '7:00pm',  false],
-
-    ['6:59pm', '7:00pm',  true],
-
-    ['12:00pm', '1:29pm', true],
-
-    ['12:00pm', '1:30pm', false]
-
-  ];
-
-
-
-  let fallos = 0;
-
-
-
-  casos.forEach(caso => {
-
-    const a = horaAMinutos_(caso[0]);
-
-    const b = horaAMinutos_(caso[1]);
-
-    const obtenido = intervalosSeSolapan_(a, b, DURACION_RESERVA_MINUTOS);
-
-    const pasa = obtenido === caso[2];
-
-
-
-    if (!pasa) fallos++;
-
-
-
-    Logger.log(
-
-      '%s vs %s | esperado=%s | obtenido=%s | %s',
-
-      caso[0],
-
-      caso[1],
-
-      caso[2],
-
-      obtenido,
-
-      pasa ? 'PASS' : 'FAIL'
-
-    );
-
-  });
-
-
-
-  Logger.log(
-
-    fallos === 0
-
-      ? 'PRUEBA DE PRESIÓN 90 MIN: PASS'
-
-      : 'PRUEBA DE PRESIÓN 90 MIN: FAIL (' + fallos + ' caso(s))'
-
-  );
-
-}
-
-
-
-// ============================================================
-
-// ASIGNACIÓN AUTOMÁTICA DE MESA (Gap 1 y 2)
-
-// Elige la mesa más pequeña disponible que alcance
-
-// ============================================================
-
-
-
-function capacidadTotalBooth_() {
-
-  const mesasBooth = getMesas().filter(m => m.espacio === 'Booth');
-
-  return mesasBooth.reduce((total, m) => total + Number(m.capacidad || 0), 0);
-
-}
-
-
-
-function puestosOcupadosBooth_(fecha, hora) {
-
-  return getReservasActivas(fecha, hora)
-
-    .filter(r => r.espacio === 'Booth')
-
-    .reduce((total, r) => total + Number(r.personas || 0), 0);
-
-}
-
-
-
-function puestosDisponiblesBooth_(fecha, hora) {
-
-  return Math.max(0, capacidadTotalBooth_() - puestosOcupadosBooth_(fecha, hora));
-
-}
-
-
-
-function asignarMesa(espacio, personas, fecha, hora) {
-
-  const cantidad = Number(personas || 0);
-
-  const mesas = getMesas().filter(m => m.espacio === espacio);
-
-  const reservasActivas = getReservasActivas(fecha, hora);
-
-
-
-  // ------------------------------------------------------------
-
-  // BOOTH: capacidad compartida por puestos, no bloqueo de mesa completa.
-
-  // Ej.: capacidad 8; si hay 2 personas ocupando, quedan 6 reservables.
-
-  // Todas las reservas solapadas dentro de 90 min descuentan sus personas.
-
-  // ------------------------------------------------------------
-
-  if (espacio === 'Booth') {
-
-    const capacidadTotal = mesas.reduce(
-
-      (total, m) => total + Number(m.capacidad || 0),
-
-      0
-
-    );
-
-
-
-    const ocupados = reservasActivas
-
-      .filter(r => r.espacio === 'Booth')
-
-      .reduce((total, r) => total + Number(r.personas || 0), 0);
-
-
-
-    const disponibles = Math.max(0, capacidadTotal - ocupados);
-
-
-
-    if (cantidad > 0 && cantidad <= disponibles) {
-
-      // Para Staff conservamos el nombre físico del Booth.
-
-      // Si existe una sola fila Booth-1 capacidad 8, devuelve Booth-1.
-
-      return mesas.length > 0 ? mesas[0].mesa : 'Booth';
-
-    }
-
-
-
-    return null;
-
-  }
-
-
-
-  // ------------------------------------------------------------
-
-  // RESTO DE ÁREAS: se conserva la lógica de bloqueo por mesa completa.
-
-  // ------------------------------------------------------------
-
-  const ocupadas = [];
-
-  reservasActivas
-
-    .filter(r => r.espacio === espacio)
-
-    .forEach(r => {
-
-      (r.mesaAsignada || '').split('+').forEach(m => {
-
-        const limpio = m.trim();
-
-        if (limpio) ocupadas.push(limpio);
-
-      });
-
-    });
-
-
-
-  const disponibles = mesas.filter(m => ocupadas.indexOf(m.mesa) === -1);
-
-
-
-  // 1. Mesa individual que alcance (la más chica primero)
-
-  const individuales = disponibles
-
-    .filter(m => Number(m.capacidad) >= cantidad)
-
-    .sort((a, b) => Number(a.capacidad) - Number(b.capacidad));
-
-
-
-  if (individuales.length > 0) return individuales[0].mesa;
-
-
-
-  // 2. Si ninguna mesa individual alcanza, combinar dos mesas del mismo espacio
-
-  const ordenadas = disponibles
-
-    .slice()
-
-    .sort((a, b) => Number(a.capacidad) - Number(b.capacidad));
-
-
-
-  for (let i = 0; i < ordenadas.length; i++) {
-
-    for (let j = i + 1; j < ordenadas.length; j++) {
-
-      const total =
-
-        Number(ordenadas[i].capacidad) + Number(ordenadas[j].capacidad);
-
-
-
-      if (total >= cantidad) {
-
-        return ordenadas[i].mesa + ' + ' + ordenadas[j].mesa;
-
-      }
-
-    }
-
-  }
-
-
-
-  return null;
-
-}
-
-
-
-// ============================================================
-
-// PRUEBA DE PRESIÓN BOOTH + 90 MINUTOS
-
-// No modifica Google Sheets.
-
-// ============================================================
-
-
-
-function pruebaPresionBooth90Min() {
-
-  const capacidad = 8;
-
-
-
-  function ocupadosEn_(horaConsulta, reservas) {
-
-    const consulta = horaAMinutos_(horaConsulta);
-
-
-
-    return reservas.reduce((total, r) => {
-
-      const inicio = horaAMinutos_(r.hora);
-
-      const ocupa = intervalosSeSolapan_(
-
-        consulta,
-
-        inicio,
-
-        DURACION_RESERVA_MINUTOS
-
-      );
-
-      return total + (ocupa ? Number(r.personas) : 0);
-
-    }, 0);
-
-  }
-
-
-
-  function puedeReservar_(horaConsulta, personasSolicitadas, reservas) {
-
-    const ocupados = ocupadosEn_(horaConsulta, reservas);
-
-    return personasSolicitadas <= (capacidad - ocupados);
-
-  }
-
-
-
-  const pruebas = [
-
-    {
-
-      nombre: 'Misma hora: 2 ocupados, pedir 6',
-
-      hora: '7:00pm',
-
-      pedir: 6,
-
-      reservas: [{ hora: '7:00pm', personas: 2 }],
-
-      esperado: true
-
-    },
-
-    {
-
-      nombre: 'Misma hora: 2 ocupados, pedir 7',
-
-      hora: '7:00pm',
-
-      pedir: 7,
-
-      reservas: [{ hora: '7:00pm', personas: 2 }],
-
-      esperado: false
-
-    },
-
-    {
-
-      nombre: 'Misma hora: 3 + 2 ocupados, pedir 3',
-
-      hora: '7:00pm',
-
-      pedir: 3,
-
-      reservas: [
-
-        { hora: '7:00pm', personas: 3 },
-
-        { hora: '7:00pm', personas: 2 }
-
-      ],
-
-      esperado: true
-
-    },
-
-    {
-
-      nombre: 'Misma hora: 3 + 2 ocupados, pedir 4',
-
-      hora: '7:00pm',
-
-      pedir: 4,
-
-      reservas: [
-
-        { hora: '7:00pm', personas: 3 },
-
-        { hora: '7:00pm', personas: 2 }
-
-      ],
-
-      esperado: false
-
-    },
-
-    {
-
-      nombre: 'Solapamiento: reserva 7:00 de 2, pedir 6 a las 8:00',
-
-      hora: '8:00pm',
-
-      pedir: 6,
-
-      reservas: [{ hora: '7:00pm', personas: 2 }],
-
-      esperado: true
-
-    },
-
-    {
-
-      nombre: 'Solapamiento: reserva 7:00 de 2, pedir 7 a las 8:00',
-
-      hora: '8:00pm',
-
-      pedir: 7,
-
-      reservas: [{ hora: '7:00pm', personas: 2 }],
-
-      esperado: false
-
-    },
-
-    {
-
-      nombre: 'Liberación exacta: reserva 7:00 de 8, pedir 8 a las 8:30',
-
-      hora: '8:30pm',
-
-      pedir: 8,
-
-      reservas: [{ hora: '7:00pm', personas: 8 }],
-
-      esperado: true
-
-    },
-
-    {
-
-      nombre: 'Reservas solapadas: 2 a las 7:00 + 3 a las 8:00, pedir 3 a las 8:00',
-
-      hora: '8:00pm',
-
-      pedir: 3,
-
-      reservas: [
-
-        { hora: '7:00pm', personas: 2 },
-
-        { hora: '8:00pm', personas: 3 }
-
-      ],
-
-      esperado: true
-
-    },
-
-    {
-
-      nombre: 'Reservas solapadas: 2 a las 7:00 + 3 a las 8:00, pedir 4 a las 8:00',
-
-      hora: '8:00pm',
-
-      pedir: 4,
-
-      reservas: [
-
-        { hora: '7:00pm', personas: 2 },
-
-        { hora: '8:00pm', personas: 3 }
-
-      ],
-
-      esperado: false
-
-    },
-
-    {
-
-      nombre: 'A las 8:30 expira la de 7:00; quedan 3 ocupados desde 8:00; pedir 5',
-
-      hora: '8:30pm',
-
-      pedir: 5,
-
-      reservas: [
-
-        { hora: '7:00pm', personas: 2 },
-
-        { hora: '8:00pm', personas: 3 }
-
-      ],
-
-      esperado: true
-
-    }
-
-  ];
-
-
-
-  let fallos = 0;
-
-
-
-  pruebas.forEach(p => {
-
-    const obtenido = puedeReservar_(p.hora, p.pedir, p.reservas);
-
-    const pasa = obtenido === p.esperado;
-
-    if (!pasa) fallos++;
-
-
-
-    Logger.log(
-
-      '%s | esperado=%s | obtenido=%s | %s',
-
-      p.nombre,
-
-      p.esperado,
-
-      obtenido,
-
-      pasa ? 'PASS' : 'FAIL'
-
-    );
-
-  });
-
-
-
-  Logger.log(
-
-    fallos === 0
-
-      ? 'PRUEBA DE PRESIÓN BOOTH + 90 MIN: PASS'
-
-      : 'PRUEBA DE PRESIÓN BOOTH + 90 MIN: FAIL (' + fallos + ' caso(s))'
-
-  );
-
-}
-
-
-
-// ============================================================
-// PRUEBA DE PRESIÓN — CONTROL DE LLEGADAS 12 PERSONAS / 15 MIN
-// No modifica Google Sheets.
-// ============================================================
-
-function pruebaPresionControlLlegadas15Min() {
-  const casosCupo = [
-    ['0 + 6', 0, 6, true],
-    ['6 + 6 = 12', 6, 6, true],
-    ['10 + 2 = 12', 10, 2, true],
-    ['10 + 3 = 13', 10, 3, false],
-    ['12 + 1 = 13', 12, 1, false],
-    ['11 + 1 = 12', 11, 1, true],
-    ['0 + 12 = 12', 0, 12, true],
-    ['0 + 13 = 13', 0, 13, false]
-  ];
-
-  const casosHorario = [
-    ['martes 1:00pm', '2026-10-20', '1:00pm', true, true],
-    ['martes 1:15pm', '2026-10-20', '1:15pm', true, true],
-    ['martes 3:00pm', '2026-10-20', '3:00pm', true, true],
-    ['martes 3:15pm', '2026-10-20', '3:15pm', false, false],
-    ['martes 3:30pm', '2026-10-20', '3:30pm', false, true],
-    ['martes 5:00pm', '2026-10-20', '5:00pm', false, true],
-    ['martes 5:15pm', '2026-10-20', '5:15pm', false, false],
-    ['martes 5:30pm', '2026-10-20', '5:30pm', true, true],
-    ['martes 5:45pm', '2026-10-20', '5:45pm', true, true],
-    ['martes 8:30pm', '2026-10-20', '8:30pm', true, true],
-    ['martes 8:45pm', '2026-10-20', '8:45pm', false, false],
-    ['sábado 6:00pm', '2026-10-24', '6:00pm', true, true],
-    ['domingo 6:00pm', '2026-10-25', '6:00pm', false, false],
-    ['lunes 6:00pm', '2026-10-26', '6:00pm', false, false]
-  ];
-
-  let fallos = 0;
-
-  casosCupo.forEach(caso => {
-    const obtenido = puedeAceptarPersonasEnBloque_(caso[1], caso[2]);
-    const pasa = obtenido === caso[3];
-    if (!pasa) fallos++;
-
-    Logger.log(
-      'CUPO | %s | esperado=%s | obtenido=%s | %s',
-      caso[0],
-      caso[3],
-      obtenido,
-      pasa ? 'PASS' : 'FAIL'
-    );
-  });
-
-  casosHorario.forEach(caso => {
-    const aplica = esHorarioControlLlegadas_(caso[1], caso[2]);
-    const horaPermitida = esHoraPublicaPermitida_(caso[1], caso[2]);
-
-    const pasa =
-      aplica === caso[3] &&
-      horaPermitida === caso[4];
-
-    if (!pasa) fallos++;
-
-    Logger.log(
-      'HORARIO | %s | control esperado=%s obtenido=%s | permitido esperado=%s obtenido=%s | %s',
-      caso[0],
-      caso[3],
-      aplica,
-      caso[4],
-      horaPermitida,
-      pasa ? 'PASS' : 'FAIL'
-    );
-  });
-
-  Logger.log(
-    fallos === 0
-      ? 'PRUEBA CONTROL LLEGADAS 12/15: PASS'
-      : 'PRUEBA CONTROL LLEGADAS 12/15: FAIL (' + fallos + ' caso(s))'
-  );
-
-  return {
-    exito: fallos === 0,
-    fallos: fallos,
-    totalCasos: casosCupo.length + casosHorario.length
-  };
-}
-
-
-// ============================================================
-
-// CREAR RESERVA (llamada desde la web app del cliente)
-
-// ============================================================
-
-
-
-function crearReserva(datos) {
-
-  // datos: { fecha, hora, espacio, personas, nombre, telefono, correo,
-  //          alergias, ocasion, metodoPago }
-
-  const cantidad = Number(datos.personas || 0);
-  if (estaFechaCerrada_(datos.fecha)) {
-    return { exito:false, mensaje:'El restaurante estará cerrado en esa fecha. Selecciona otro día.' };
-  }
-
-
-  if (!esHoraPublicaPermitida_(datos.fecha, datos.hora)) {
-    return {
-      exito: false,
-      mensaje: 'Ese horario no está habilitado para reservas.'
-    };
-  }
-
-  const lock = LockService.getScriptLock();
-
-  try {
-    lock.waitLock(10000);
-  } catch (error) {
-    return {
-      exito: false,
-      mensaje: 'Estamos procesando otra reserva en este momento. Intenta nuevamente.'
-    };
-  }
-
-  let mesaAsignada = null;
-  let config = null;
-  let sinPago = false;
-  let montoDeposito = 0;
-  let ahora = null;
-  let fechaLimite = null;
-  let estadoInicial = 'Pendiente de pago';
-  let id = '';
-  let rowReserva = null;
-
-  try {
-    // Segunda validación, dentro del bloqueo, para impedir que dos reservas
-    // simultáneas superen las 12 personas del mismo bloque.
-    const cupoLlegadas = validarCupoLlegadas_(datos.fecha, datos.hora, cantidad);
-
-    if (!cupoLlegadas.disponible) {
-      return {
-        exito: false,
-        mensaje: 'Este horario alcanzó el máximo de 12 personas. Selecciona otro horario.'
-      };
-    }
-
-    mesaAsignada = asignarMesa(
-      datos.espacio,
-      cantidad,
-      datos.fecha,
-      datos.hora
-    );
-
-    if (!mesaAsignada) {
-      return {
-        exito: false,
-        mensaje: 'Ya no hay disponibilidad para ese espacio y horario.'
-      };
-    }
-
-    config = getConfig();
-    sinPago = datos.metodoPago === 'Sin pago';
-    montoDeposito = sinPago ? 0 : 10 * cantidad;
-    ahora = new Date();
-
-    if (sinPago) {
-      estadoInicial = 'Confirmada';
-    } else {
-      const horasRetencion = datos.metodoPago === 'ACH'
-        ? config.retencion_ach_horas
-        : config.retencion_yappy_horas;
-
-      fechaLimite = new Date(
-        ahora.getTime() + horasRetencion * 60 * 60 * 1000
-      );
-    }
-
-    id = 'BB-' + Utilities.formatDate(
-      ahora,
-      Session.getScriptTimeZone(),
-      'yyyyMMddHHmmss'
-    );
-
-    const sheet = getSheet('Reservas');
-
-    sheet.appendRow([
-      id,
-      datos.fecha,
-      datos.hora,
-      datos.espacio,
-      mesaAsignada,
-      cantidad,
-      datos.nombre,
-      datos.telefono,
-      datos.correo,
-      datos.alergias || '',
-      datos.ocasion || '',
-      datos.metodoPago,
-      montoDeposito,
-      estadoInicial,
-      sinPago ? 'N/A' : 'No',
-      ahora,
-      fechaLimite,
-      'Cliente',
-      ''
+function kicker(t){return `<div class="step-kicker">Paso ${state.step} de 4</div><h1>${t}</h1>`;}
+
+async function cargarBase(){
+  try{
+    const [w,c]=await Promise.all([
+      api("getWhatsappNumero"),
+      api("getFechasCerradasPublicas")
     ]);
+    state.whatsapp=w||"";
+    state.cierres=Array.isArray(c)?c:[];
+  }catch(e){console.warn(e);}
+}
+cargarBase();
 
-    SpreadsheetApp.flush();
+function render(){
+  prog.forEach((x,i)=>x.classList.toggle("on",i<state.step));
+  if(state.step===1) renderIdentidad();
+  if(state.step===2) renderReserva();
+  if(state.step===3) renderDatos();
+  if(state.step===4) renderConfirmacion();
+}
 
-    rowReserva = sheet
-      .getRange(sheet.getLastRow(), 1, 1, sheet.getLastColumn())
-      .getValues()[0];
+function renderIdentidad(){
+  app.innerHTML=`
+    ${kicker("Reserva tu mesa")}
+    <p class="lead">Empecemos por tu número de teléfono. Si ya nos has visitado, podremos reconocerte y hacer tu reserva más rápida.</p>
+    <div class="card">
+      <div class="phone-grid">
+        <div class="field">
+          <label>Código país</label>
+          <input id="codigoPais" value="${esc(state.codigoPais)}" inputmode="tel" placeholder="+507">
+        </div>
+        <div class="field">
+          <label>Teléfono</label>
+          <input id="telefono" value="${esc(state.telefono)}" inputmode="tel" placeholder="6000-1234">
+        </div>
+      </div>
+      <button class="btn" id="buscarBtn">${state.cargando?"Buscando...":"Continuar"}</button>
+      <div class="note">Aceptamos números internacionales. Ej.: +507, +1, +34, +57.</div>
+      ${msg()}
+      <div id="identityBox"></div>
+    </div>
+    <div class="privacy-box">Tus datos se utilizan únicamente para gestionar tu reserva y mejorar tu experiencia en Baran Blü. No vendemos ni compartimos tus datos con terceros para fines comerciales.</div>
+  `;
+  document.getElementById("buscarBtn").onclick=buscarTelefono;
+  if(state.nombre || state.apellido || state.reconocido) mostrarIdentidad();
+}
 
-  } finally {
-    lock.releaseLock();
-  }
+async function buscarTelefono(){
+  state.codigoPais=document.getElementById("codigoPais").value.trim()||"+507";
+  state.telefono=document.getElementById("telefono").value.trim();
+  if(!state.telefono){state.error="Ingresa tu número de teléfono.";render();return;}
+  state.error="";state.cargando=true;render();
+  try{
+    const r=await api("buscarClientePublico",[state.codigoPais,state.telefono]);
+    state.cargando=false;
+    state.reconocido=false;
+    state.cumpleRegistrado=false;
+    if(r.tipo==="UNICO"){
+      state.nombre=r.nombre||"";
+      state.cumpleRegistrado=!!r.cumpleRegistrado;
+    }else if(r.tipo==="NUEVO"){
+      state.nombre="";state.apellido="";
+    }else{
+      state.nombre="";state.apellido="";
+    }
+    render();
+    mostrarIdentidad(r);
+  }catch(e){err(e);}
+}
 
-  // Los correos se envían después de liberar el bloqueo para no frenar
-  // otras reservas mientras Zoho responde.
-  intentarEnviarNotificacionRestaurante_(rowReserva);
+function mostrarIdentidad(r){
+  const box=document.getElementById("identityBox"); if(!box)return;
+  box.innerHTML=`
+    <div class="welcome">
+      ${r&&r.tipo==="UNICO"?`<strong>¡Qué gusto verte de nuevo, ${esc(r.nombre)}!</strong><div class="note">Confirma tu nombre y apellido para continuar.</div>`:
+      r&&r.tipo==="COMPARTIDO"?`<strong>Ya conocemos este número.</strong><div class="note">Como puede estar asociado a más de una persona, indícanos quién realiza la reserva.</div>`:
+      `<strong>Completa tus datos</strong><div class="note">Nombre y apellido nos ayudan a identificar correctamente tu reserva.</div>`}
+    </div>
+    <div class="name-grid">
+      <div class="field"><label>Nombre *</label><input id="nombre" value="${esc(state.nombre)}"></div>
+      <div class="field"><label>Apellido *</label><input id="apellido" value="${esc(state.apellido)}"></div>
+    </div>
+    <button class="btn" id="confirmIdentidad">Continuar con la reserva</button>
+  `;
+  document.getElementById("confirmIdentidad").onclick=confirmarIdentidad;
+}
 
-  let resultadoCorreo = { enviado: false, error: '' };
+async function confirmarIdentidad(){
+  state.nombre=document.getElementById("nombre").value.trim();
+  state.apellido=document.getElementById("apellido").value.trim();
+  if(state.nombre.length<2||state.apellido.length<2){state.error="Completa nombre y apellido.";render();mostrarIdentidad();return;}
+  state.error="";
+  try{
+    const r=await api("identificarClienteCompartidoPublico",[state.codigoPais,state.telefono,state.nombre,state.apellido]);
+    state.reconocido=!!r.reconocido;
+    state.cumpleRegistrado=!!r.cumpleRegistrado;
+  }catch(e){console.warn(e);}
+  setStep(2);
+}
 
-  if (sinPago) {
-    resultadoCorreo = intentarEnviarCorreoConfirmacion_(rowReserva);
-  }
-
-  return {
-    exito: true,
-    id: id,
-    mesaAsignada: mesaAsignada,
-    montoDeposito: montoDeposito,
-    metodoPago: datos.metodoPago,
-    correoEnviado: resultadoCorreo.enviado,
-    avisoCorreo: resultadoCorreo.error
-      ? 'La reserva quedó registrada, pero no se pudo enviar el correo de confirmación.'
-      : '',
-    datosACH: datos.metodoPago === 'ACH' ? {
-      banco: config.banco_nombre,
-      tipoCuenta: config.banco_tipo_cuenta,
-      numeroCuenta: config.banco_numero_cuenta,
-      titular: config.banco_titular,
-      ruc: config.banco_ruc,
-      whatsapp: config.whatsapp_numero
-    } : null
+function renderReserva(){
+  const fechas=proximasFechas(6);
+  if(!state.fecha && fechas[0]){state.fecha=fechas[0].v;state.fechaLabel=fechas[0].label;}
+  app.innerHTML=`
+    ${kicker("Elige tu reserva")}
+    <p class="lead">${state.reconocido?`¡Qué gusto verte de nuevo, ${esc(state.nombre)}! `:""}Selecciona personas, fecha, hora y espacio.</p>
+    <div class="card">
+      <div class="field"><label>Número de personas</label>
+        <div class="pills">${[1,2,3,4,5,6].map(n=>`<button class="pill ${state.personas===n?"active":""}" data-p="${n}">${n}</button>`).join("")}</div>
+      </div>
+      <div class="field"><label>Fecha</label>
+        <div class="pills">${fechas.map(f=>`<button class="pill ${state.fecha===f.v?"active":""}" data-f="${f.v}" data-l="${f.label}">${f.label}</button>`).join("")}</div>
+      </div>
+      <div class="field"><label>Horario de llegada</label>
+        <div class="pills">${HORAS.map(h=>`<button class="pill ${state.hora===h?"active":""}" data-h="${h}">${h.replace("pm"," pm")}</button>`).join("")}</div>
+      </div>
+      <div class="field"><label>Espacio</label><div class="spaces" id="spaces">${Object.keys(ESPACIOS).map(k=>{
+        const ok=state.disponibilidad[k]!==false;
+        return `<div class="space ${state.espacio===k?"active":""} ${ok?"":"off"}" data-s="${k}"><strong>${ESPACIOS[k][0]}</strong><small>${ok?ESPACIOS[k][1]:"Sin disponibilidad"}</small></div>`;
+      }).join("")}</div></div>
+      ${msg()}
+      <button class="btn" id="next2" ${(!state.personas||!state.fecha||!state.hora||!state.espacio)?"disabled":""}>Continuar</button>
+      <button class="btn secondary" id="back2">Volver</button>
+    </div>
+    <div class="wa">¿Grupo de 7 o más o una solicitud especial? <span class="link" id="waLink">Escríbenos por WhatsApp.</span></div>
+  `;
+  document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{state.personas=Number(b.dataset.p);state.espacio="";state.disponibilidad={};renderReserva();cargarDisponibilidad();});
+  document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{state.fecha=b.dataset.f;state.fechaLabel=b.dataset.l;state.espacio="";state.disponibilidad={};renderReserva();cargarDisponibilidad();});
+  document.querySelectorAll("[data-h]").forEach(b=>b.onclick=()=>{state.hora=b.dataset.h;state.espacio="";state.disponibilidad={};renderReserva();cargarDisponibilidad();});
+  document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{if(!b.classList.contains("off")){state.espacio=b.dataset.s;renderReserva();}});
+  document.getElementById("next2").onclick=()=>setStep(3);
+  document.getElementById("back2").onclick=()=>setStep(1);
+  document.getElementById("waLink").onclick=()=>{
+    const n=String(state.whatsapp||"").replace(/\D/g,""); if(n) window.open(`https://wa.me/${n}`,"_blank");
   };
-
+  if(state.personas&&state.fecha&&state.hora&&Object.keys(state.disponibilidad).length===0)cargarDisponibilidad();
 }
 
-// ============================================================
-
-// CREAR RESERVA MANUAL (grupos 7+, llamadas telefónicas — desde panel staff)
-
-// ============================================================
-
-
-
-function crearReservaManual(datos, nombreStaff) {
-
-  // datos incluye espacio/mesa ya decididos manualmente por el staff,
-
-  // puede ser una combinación de mesas (string separado por coma)
-
-  const config = getConfig();
-
-  const montoDeposito = 10 * datos.personas;
-
-  const ahora = new Date();
-
-  const id = 'BB-' + Utilities.formatDate(ahora, Session.getScriptTimeZone(), 'yyyyMMddHHmmss');
-
-
-
-  const sheet = getSheet('Reservas');
-
-  sheet.appendRow([
-
-    id,
-
-    datos.fecha,
-
-    datos.hora,
-
-    datos.espacio,
-
-    datos.mesaAsignada, // ej. "Sala-4 + Sala-5 + Booth-1"
-
-    datos.personas,
-
-    datos.nombre,
-
-    datos.telefono,
-
-    datos.correo,
-
-    datos.alergias || '',
-
-    datos.ocasion || '',
-
-    datos.metodoPago,
-
-    montoDeposito,
-
-    'Pendiente de pago',
-
-    'No',
-
-    ahora,
-
-    null, // sin expiración automática en reservas manuales
-
-    'Staff: ' + nombreStaff,
-
-    datos.notas || ''
-
-  ]);
-
-
-
-  return { exito: true, id: id, montoDeposito: montoDeposito };
-
+async function cargarDisponibilidad(){
+  if(!state.personas||!state.fecha||!state.hora)return;
+  try{
+    const r=await api("getDisponibilidad",[state.fecha,state.hora,state.personas]);
+    state.disponibilidad=r||{};
+    if(state.espacio && state.disponibilidad[state.espacio]===false)state.espacio="";
+    renderReserva();
+  }catch(e){err(e);}
 }
 
-
-
-// ============================================================
-
-// CONFIRMAR PAGO (Yappy automático o ACH manual desde el panel)
-
-// ============================================================
-
-
-
-function confirmarPago(idReserva) {
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    if (data[i][idx['ID']] === idReserva) {
-
-      sheet.getRange(i + 1, idx['Estado'] + 1).setValue('Confirmada');
-
-      sheet.getRange(i + 1, idx['Comprobante ACH recibido'] + 1).setValue('Sí');
-
-      const resultadoCorreo = intentarEnviarCorreoConfirmacion_(data[i]);
-
-      return {
-
-        exito: true,
-
-        correoEnviado: resultadoCorreo.enviado,
-
-        avisoCorreo: resultadoCorreo.error
-
-          ? 'El pago quedó confirmado, pero no se pudo enviar el correo de confirmación.'
-
-          : ''
-
-      };
-
-    }
-
-  }
-
-  return { exito: false, mensaje: 'Reserva no encontrada' };
-
-}
-
-
-
-// ============================================================
-
-// CANCELAR RESERVA (desde el panel de staff)
-
-// ============================================================
-
-
-
-function cancelarReserva(idReserva, aplicaReembolso, token) {
-  requerirSesionStaff_(token);
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    if (data[i][idx['ID']] === idReserva) {
-
-      const nuevoEstado = aplicaReembolso ? 'Reembolso pendiente' : 'Cancelada';
-
-      sheet.getRange(i + 1, idx['Estado'] + 1).setValue(nuevoEstado);
-
-
-
-      if (aplicaReembolso) {
-
-        registrarReembolsoPendiente(data[i], idx);
-
-      }
-
-      return { exito: true };
-
-    }
-
-  }
-
-  return { exito: false, mensaje: 'Reserva no encontrada' };
-
-}
-
-
-
-function registrarReembolsoPendiente(row, idx) {
-
-  const config = getConfig();
-
-  const monto = row[idx['Monto depósito']] * (config.porcentaje_devolucion / 100);
-
-  const sheet = getSheet('Log Reembolsos');
-
-  const hoy = new Date();
-
-  const plazo = new Date(hoy.getTime() + 5 * 24 * 60 * 60 * 1000); // aprox., no distingue días hábiles
-
-
-
-  sheet.appendRow([
-
-    row[idx['ID']],
-
-    monto,
-
-    hoy,
-
-    plazo,
-
-    'Pendiente',
-
-    ''
-
-  ]);
-
-}
-
-
-
-// ============================================================
-
-// PANEL DE STAFF — lista de reservas
-
-// ============================================================
-
-
-
-function getReservasParaPanel(token) {
-  requerirSesionStaff_(token);
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  const resultado = [];
-
-  for (let i = 1; i < data.length; i++) {
-
-    const row = data[i];
-
-    if (!row[idx['ID']]) continue;
-
-    resultado.push({
-
-      id: row[idx['ID']],
-
-      fechaISO: normalizarFecha(row[idx['Fecha']]),
-
-      fecha: (function(v){
-
-        const f = normalizarFecha(v); // 'yyyy-MM-dd'
-
-        const partes = f.split('-');
-
-        return partes.length === 3 ? `${partes[2]}/${partes[1]}/${partes[0]}` : f;
-
-      })(row[idx['Fecha']]),
-
-      hora: row[idx['Hora']],
-
-      espacio: row[idx['Espacio']],
-
-      mesaAsignada: row[idx['Mesa asignada']],
-
-      personas: row[idx['Personas']],
-
-      nombre: row[idx['Nombre cliente']],
-
-      telefono: row[idx['Teléfono']],
-
-      correo: row[idx['Correo']],
-
-      metodoPago: row[idx['Método de pago']],
-
-      montoDeposito: row[idx['Monto depósito']],
-
-      estado: row[idx['Estado']]
-
-    });
-
-  }
-
-  // Más recientes primero
-
-  return resultado.reverse();
-
-}
-
-
-
-// ============================================================
-
-// MARCAR REEMBOLSO COMO RESUELTO (Gap 5)
-
-// ============================================================
-
-
-
-function marcarReembolsoResuelto(idReserva) {
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    if (data[i][idx['ID']] === idReserva) {
-
-      sheet.getRange(i + 1, idx['Estado'] + 1).setValue('Reembolso realizado');
-
-      break;
-
-    }
-
-  }
-
-
-
-  // También actualiza el log de reembolsos
-
-  const logSheet = getSheet('Log Reembolsos');
-
-  const logData = logSheet.getDataRange().getValues();
-
-  for (let i = 1; i < logData.length; i++) {
-
-    if (logData[i][0] === idReserva) {
-
-      logSheet.getRange(i + 1, 5).setValue('Resuelto'); // columna "Estado"
-
-      logSheet.getRange(i + 1, 6).setValue(new Date()); // columna "Fecha de devolución real"
-
-      break;
-
-    }
-
-  }
-
-
-
-  return { exito: true };
-
-}
-
-
-
-// ============================================================
-
-// MARCAR LLEGADA / NO-SHOW (Gap 6)
-
-// ============================================================
-
-
-
-function marcarLlegada(idReserva, llego, token) {
-  requerirSesionStaff_(token);
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    if (data[i][idx['ID']] === idReserva) {
-
-      sheet.getRange(i + 1, idx['Estado'] + 1).setValue(llego ? 'Completada' : 'No-show');
-
-      return { exito: true };
-
-    }
-
-  }
-
-  return { exito: false };
-
-}
-
-// ============================================================
-
-// CONEXIÓN CON ZOHO MAIL
-
-// ============================================================
-
-
-
-const ZOHO_CORREO_REMITENTE = 'hola@baranblu.com';
-
-
-
-function obtenerAccessTokenZoho_() {
-
-  const props = PropertiesService.getScriptProperties();
-
-
-
-  const clientId = props.getProperty('ZOHO_CLIENT_ID').trim();
-
-  const clientSecret = props.getProperty('ZOHO_CLIENT_SECRET').trim();
-
-  const refreshToken = props.getProperty('ZOHO_REFRESH_TOKEN').trim();
-
-
-
-  const url =
-
-    'https://accounts.zoho.com/oauth/v2/token' +
-
-    '?grant_type=refresh_token' +
-
-    '&client_id=' + encodeURIComponent(clientId) +
-
-    '&client_secret=' + encodeURIComponent(clientSecret) +
-
-    '&refresh_token=' + encodeURIComponent(refreshToken);
-
-
-
-  const respuesta = UrlFetchApp.fetch(url, {
-
-    method: 'post',
-
-    muteHttpExceptions: true
-
-  });
-
-
-
-  const codigoHttp = respuesta.getResponseCode();
-
-  const texto = respuesta.getContentText();
-
-  const resultado = JSON.parse(texto);
-
-
-
-  if (
-
-    codigoHttp < 200 ||
-
-    codigoHttp >= 300 ||
-
-    !resultado.access_token
-
-  ) {
-
-    throw new Error(
-
-      'No fue posible renovar el acceso a Zoho. HTTP ' +
-
-      codigoHttp +
-
-      ': ' +
-
-      texto
-
-    );
-
-  }
-
-
-
-  return resultado.access_token;
-
-}
-
-
-
-function configurarCuentaZoho() {
-
-  const token = obtenerAccessTokenZoho_();
-
-
-
-  const respuesta = UrlFetchApp.fetch(
-
-    'https://mail.zoho.com/api/accounts',
-
-    {
-
-      method: 'get',
-
-      headers: {
-
-        Authorization: 'Zoho-oauthtoken ' + token
-
-      },
-
-      muteHttpExceptions: true
-
-    }
-
-  );
-
-
-
-  const codigoHttp = respuesta.getResponseCode();
-
-  const resultado = JSON.parse(respuesta.getContentText());
-
-
-
-  if (
-
-    codigoHttp < 200 ||
-
-    codigoHttp >= 300 ||
-
-    !resultado.data ||
-
-    !resultado.data.length
-
-  ) {
-
-    throw new Error(
-
-      'No fue posible consultar la cuenta de Zoho: ' +
-
-      respuesta.getContentText()
-
-    );
-
-  }
-
-
-
-  const cuenta = resultado.data[0];
-
-
-
-  if (!cuenta.accountId) {
-
-    throw new Error(
-
-      'Zoho respondió, pero no proporcionó el identificador de la cuenta.'
-
-    );
-
-  }
-
-
-
-  PropertiesService
-
-    .getScriptProperties()
-
-    .setProperty(
-
-      'ZOHO_ACCOUNT_ID',
-
-      cuenta.accountId.toString()
-
-    );
-
-
-
-  Logger.log(
-
-    'Cuenta Zoho configurada correctamente para Baran Blü.'
-
-  );
-
-}
-
-function enviarCorreoZoho_(destinatario, asunto, cuerpo) {
-
-  const props = PropertiesService.getScriptProperties();
-
-  const accountId = props.getProperty('ZOHO_ACCOUNT_ID');
-
-
-
-  if (!accountId) {
-
-    throw new Error(
-
-      'Falta ZOHO_ACCOUNT_ID. Ejecuta primero configurarCuentaZoho().'
-
-    );
-
-  }
-
-
-
-  const token = obtenerAccessTokenZoho_();
-
-
-
-  const payload = {
-
-    fromAddress: ZOHO_CORREO_REMITENTE,
-
-    toAddress: destinatario,
-
-    subject: asunto,
-
-    content: cuerpo,
-
-    mailFormat: 'plaintext',
-
-    encoding: 'UTF-8'
-
+function renderDatos(){
+  app.innerHTML=`
+    ${kicker("Completa tus datos")}
+    <p class="lead">Solo pedimos la información necesaria para atender tu reserva.</p>
+    <div class="card">
+      <div class="field"><label>Correo electrónico *</label><input type="email" id="correo" value="${esc(state.correo)}" placeholder="tu@correo.com"></div>
+
+      ${state.cumpleRegistrado?`
+        <div class="welcome"><strong>🎂 Tenemos tu cumpleaños registrado.</strong>
+          <div class="note">¿La fecha no es correcta? <span class="link" id="solicitarCumpleLink">Solicitar actualización</span>.</div>
+        </div>
+        <div id="cumpleCorreccion" class="${state.solicitarCumple?"":"hidden"}">
+          <label>Fecha correcta solicitada</label>
+          <div class="bday-grid">
+            <select id="nuevoCumpleDia"><option value="">Día</option>${Array.from({length:31},(_,i)=>`<option ${String(i+1)===String(state.nuevoCumpleDia)?"selected":""}>${i+1}</option>`).join("")}</select>
+            <select id="nuevoCumpleMes"><option value="">Mes</option>${["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i)=>`<option value="${i+1}" ${String(i+1)===String(state.nuevoCumpleMes)?"selected":""}>${m}</option>`).join("")}</select>
+          </div>
+          <div class="note">Administración revisará la solicitud antes de modificar tu ficha.</div>
+        </div>
+      `:`
+        <div class="field"><label>Cumpleaños <span class="mini">(opcional)</span></label>
+          <div class="bday-grid">
+            <select id="cumpleDia"><option value="">Día</option>${Array.from({length:31},(_,i)=>`<option ${String(i+1)===String(state.cumpleDia)?"selected":""}>${i+1}</option>`).join("")}</select>
+            <select id="cumpleMes"><option value="">Mes</option>${["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m,i)=>`<option value="${i+1}" ${String(i+1)===String(state.cumpleMes)?"selected":""}>${m}</option>`).join("")}</select>
+          </div>
+          <div class="note">Nos ayuda a celebrar contigo en fechas especiales.</div>
+        </div>
+      `}
+
+      <div class="field"><label>Alergias o restricciones para esta reserva <span class="mini">(opcional)</span></label>
+        <textarea id="alergias" placeholder="Ej.: alergia a mariscos">${esc(state.alergias)}</textarea>
+      </div>
+      <div class="checkrow"><input type="checkbox" id="guardarAlergias" ${state.guardarAlergias?"checked":""}><label for="guardarAlergias">Guardar esta información para futuras reservas.</label></div>
+
+      <div class="field"><label>Ocasión especial <span class="mini">(opcional)</span></label><input id="ocasion" value="${esc(state.ocasion)}" placeholder="Cumpleaños, aniversario..."></div>
+      <div class="field"><label>Observaciones <span class="mini">(opcional)</span></label><textarea id="observaciones">${esc(state.observaciones)}</textarea></div>
+
+      <div class="checkrow"><input type="checkbox" id="marketing" ${state.consentimientoMarketing?"checked":""}><label for="marketing">Quiero recibir novedades y beneficios de Baran Blü.</label></div>
+      <div class="checkrow"><input type="checkbox" id="privacidad" ${state.privacidadAceptada?"checked":""}><label for="privacidad">Acepto la <span class="link" id="privacyLink">Política de Privacidad</span> y el uso de mis datos para gestionar esta reserva. *</label></div>
+
+      <div class="privacy-box" id="privacyText" style="display:none">
+        Baran Blü utiliza los datos proporcionados para gestionar reservas, atención al cliente y, solo cuando lo autorizas, comunicaciones comerciales. No vendemos tus datos ni los compartimos con terceros para fines comerciales. Puedes solicitar acceso, corrección o eliminación de tus datos contactando al restaurante.
+      </div>
+
+      ${msg()}
+      <button class="btn" id="next3">Revisar reserva</button>
+      <button class="btn secondary" id="back3">Volver</button>
+    </div>
+  `;
+  const q=id=>document.getElementById(id);
+  q("privacyLink").onclick=()=>{const x=q("privacyText");x.style.display=x.style.display==="none"?"block":"none";};
+  if(q("solicitarCumpleLink"))q("solicitarCumpleLink").onclick=()=>{state.solicitarCumple=true;renderDatos();};
+  q("next3").onclick=()=>{
+    state.correo=q("correo").value.trim();
+    if(!state.cumpleRegistrado){state.cumpleDia=q("cumpleDia").value;state.cumpleMes=q("cumpleMes").value;}
+    if(state.solicitarCumple){state.nuevoCumpleDia=q("nuevoCumpleDia").value;state.nuevoCumpleMes=q("nuevoCumpleMes").value;}
+    state.alergias=q("alergias").value.trim();state.guardarAlergias=q("guardarAlergias").checked;
+    state.ocasion=q("ocasion").value.trim();state.observaciones=q("observaciones").value.trim();
+    state.consentimientoMarketing=q("marketing").checked;state.privacidadAceptada=q("privacidad").checked;
+    if(!state.correo||!state.correo.includes("@")){state.error="Ingresa un correo válido.";renderDatos();return;}
+    if(!state.privacidadAceptada){state.error="Debes aceptar la Política de Privacidad para continuar.";renderDatos();return;}
+    if(state.solicitarCumple && (!state.nuevoCumpleDia||!state.nuevoCumpleMes)){state.error="Indica la fecha de cumpleaños correcta.";renderDatos();return;}
+    state.error="";renderRevision();
   };
-
-
-
-  const respuesta = UrlFetchApp.fetch(
-
-    'https://mail.zoho.com/api/accounts/' +
-
-      encodeURIComponent(accountId) +
-
-      '/messages',
-
-    {
-
-      method: 'post',
-
-      contentType: 'application/json',
-
-      headers: {
-
-        Authorization: 'Zoho-oauthtoken ' + token
-
-      },
-
-      payload: JSON.stringify(payload),
-
-      muteHttpExceptions: true
-
-    }
-
-  );
-
-
-
-  const codigoHttp = respuesta.getResponseCode();
-
-  const texto = respuesta.getContentText();
-
-
-
-  if (codigoHttp < 200 || codigoHttp >= 300) {
-
-    throw new Error(
-
-      'Zoho no pudo enviar el correo. HTTP ' +
-
-      codigoHttp +
-
-      ': ' +
-
-      texto
-
-    );
-
-  }
-
-
-
-  return true;
-
+  q("back3").onclick=()=>setStep(2);
 }
 
-
-
-/**
-
- * El correo es una acción posterior a la reserva. Si Zoho falla, registra el
-
- * error sin convertir una reserva ya guardada en una reserva fallida.
-
- */
-
-function intentarEnviarCorreoConfirmacion_(row) {
-
-  try {
-
-    enviarCorreoConfirmacion(row);
-
-    return { enviado: true, error: '' };
-
-  } catch (error) {
-
-    console.error('Reserva guardada; falló el correo de confirmación: ' + error.stack);
-
-    return {
-
-      enviado: false,
-
-      error: error && error.message ? error.message : String(error)
-
-    };
-
-  }
-
+function renderRevision(){
+  app.innerHTML=`
+    ${kicker("Revisa tu reserva")}
+    <p class="lead">Confirma que todo esté correcto antes de reservar.</p>
+    <div class="card">
+      <div class="summary">
+        <div><small>Cliente</small><strong>${esc(state.nombre)} ${esc(state.apellido)}</strong></div>
+        <div><small>Personas</small><strong>${state.personas}</strong></div>
+        <div><small>Fecha</small><strong>${esc(state.fechaLabel||state.fecha)}</strong></div>
+        <div><small>Hora</small><strong>${esc(state.hora.replace("pm"," pm"))}</strong></div>
+        <div><small>Espacio</small><strong>${esc(state.espacio)}</strong></div>
+        <div><small>Teléfono</small><strong>${esc(state.codigoPais)} ${esc(state.telefono)}</strong></div>
+      </div>
+      ${msg()}
+      <button class="btn" id="confirmarReserva">${state.cargando?"Reservando...":"Confirmar reserva"}</button>
+      <button class="btn secondary" id="editar">Volver y revisar</button>
+    </div>
+  `;
+  document.getElementById("confirmarReserva").onclick=enviarReserva;
+  document.getElementById("editar").onclick=()=>renderDatos();
 }
 
-
-
-/**
-
- * Notifica al restaurante sin afectar el resultado de la reserva si el correo
-
- * interno no pudiera enviarse.
-
- */
-
-function intentarEnviarNotificacionRestaurante_(row) {
-
-  try {
-
-    enviarNotificacionRestaurante_(row);
-
-    return { enviado: true, error: '' };
-
-  } catch (error) {
-
-    console.error('Reserva guardada; falló la notificación al restaurante: ' + error.stack);
-
-    return {
-
-      enviado: false,
-
-      error: error && error.message ? error.message : String(error)
-
-    };
-
-  }
-
-}
-
-
-
-function enviarNotificacionRestaurante_(row) {
-
-  const sheet = getSheet('Reservas');
-
-  const headers = sheet.getDataRange().getValues()[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  const config = getConfig();
-
-  const destinatario = (config.correo_notificaciones || 'salonbaranblu@gmail.com')
-
-    .toString()
-
-    .trim();
-
-
-
-  const valor = (nombre, indiceAlterno) => {
-
-    const posicion = idx[nombre];
-
-    const posicionFinal = posicion === undefined ? indiceAlterno : posicion;
-
-    return posicionFinal === undefined || row[posicionFinal] === '' || row[posicionFinal] === null
-
-      ? '—'
-
-      : row[posicionFinal];
-
+async function enviarReserva(){
+  if(state.cargando)return;
+  state.cargando=true;state.error="";renderRevision();
+  const datos={
+    fecha:state.fecha,hora:state.hora,espacio:state.espacio,personas:state.personas,
+    nombre:state.nombre,apellido:state.apellido,codigoPais:state.codigoPais,telefono:state.telefono,
+    correo:state.correo,cumpleDia:state.cumpleRegistrado?"":state.cumpleDia,cumpleMes:state.cumpleRegistrado?"":state.cumpleMes,
+    alergias:state.alergias,guardarAlergias:state.guardarAlergias,
+    ocasion:state.ocasion,observaciones:state.observaciones,
+    consentimientoMarketing:state.consentimientoMarketing,
+    privacidadAceptada:state.privacidadAceptada,canal:"Web"
   };
-
-
-
-  const id = valor('ID', 0);
-
-  const fecha = valor('Fecha');
-
-  const hora = valor('Hora');
-
-  const nombre = valor('Nombre cliente');
-
-  const metodoPago = valor('Método de pago');
-
-
-
-  const asunto = `Nueva reserva: ${fecha} · ${hora} · ${nombre}`;
-
-  let cuerpo = `Se registró una nueva reserva en Baran Blü.\n\n` +
-
-    `Reserva: ${id}\n` +
-
-    `Fecha: ${fecha}\n` +
-
-    `Hora: ${hora}\n` +
-
-    `Espacio: ${valor('Espacio')}\n` +
-
-    `Mesa: ${valor('Mesa asignada')}\n` +
-
-    `Personas: ${valor('Personas')}\n\n` +
-
-    `Cliente: ${nombre}\n` +
-
-    `Teléfono: ${valor('Teléfono')}\n` +
-
-    `Correo: ${valor('Correo')}\n` +
-
-    `Alergias o restricciones: ${valor('Alergias', 9)}\n` +
-
-    `Ocasión especial: ${valor('Ocasión', 10)}\n`;
-
-
-
-  if (metodoPago !== 'Sin pago') {
-
-    cuerpo += `\nMétodo de pago: ${metodoPago}\n` +
-
-      `Estado: ${valor('Estado')}\n` +
-
-      `Depósito: $${valor('Monto depósito')}\n`;
-
-  }
-
-
-
-  cuerpo += `\nEsta es una notificación automática del sistema de reservas.`;
-
-
-
-  enviarCorreoZoho_(destinatario, asunto, cuerpo);
-
-}
-
-// ============================================================
-
-// CORREOS AUTOMÁTICOS (Zoho)
-
-// ============================================================
-
-
-
-function enviarCorreoConfirmacion(row) {
-
-  const headers = getSheet('Reservas').getDataRange().getValues()[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-
-
-  const correo = row[idx['Correo']];
-
-  const nombre = row[idx['Nombre cliente']];
-
-  const fecha = row[idx['Fecha']];
-
-  const hora = row[idx['Hora']];
-
-  const espacio = row[idx['Espacio']];
-
-  const personas = row[idx['Personas']];
-
-  const metodoPago = row[idx['Método de pago']];
-
-
-
-  const asunto = 'Tu reserva en Baran Blü está confirmada';
-
-  let cuerpo = `Hola ${nombre},\n\n` +
-
-    `Tu reserva en Baran Blü está confirmada:\n\n` +
-
-    `Fecha: ${fecha}\nHora: ${hora}\nEspacio: ${espacio}\nPersonas: ${personas}\n\n` +
-
-    `Recuerda: tenemos 15 minutos de tolerancia después de la hora reservada.\n`;
-
-
-
-  if (metodoPago !== 'Sin pago') {
-
-    cuerpo += `El depósito es 100% consumible y se descuenta de tu cuenta al final.\n\n`;
-
-  } else {
-
-    cuerpo += `\n`;
-
-  }
-
-  cuerpo += `¡Te esperamos!\nBaran Blü — cocina de la tierra`;
-
-
-
-  enviarCorreoZoho_(correo, asunto, cuerpo);
-
-  }
-
-
-
-// ============================================================
-
-// EXPIRACIÓN AUTOMÁTICA (correr con un trigger cada 15-30 min)
-
-// ============================================================
-
-
-
-function liberarReservasVencidas() {
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getValues();
-
-  const headers = data[0];
-
-  const idx = {};
-
-  headers.forEach((h, i) => idx[h] = i);
-
-  const ahora = new Date();
-
-
-
-  for (let i = 1; i < data.length; i++) {
-
-    const estado = data[i][idx['Estado']];
-
-    const fechaLimite = data[i][idx['Fecha límite de retención']];
-
-    if (estado === 'Pendiente de pago' && fechaLimite && new Date(fechaLimite) < ahora) {
-
-      sheet.getRange(i + 1, idx['Estado'] + 1).setValue('Cancelada');
-
-      // Opcional: notificar al cliente que su cupo se liberó por falta de pago
-
+  try{
+    const r=await api("crearReservaV2",[datos]);
+    if(!r||!r.exito)throw new Error((r&&r.mensaje)||"No se pudo crear la reserva.");
+    state.resultado=r;
+    if(state.solicitarCumple){
+      try{
+        await api("solicitarCorreccionCumple",[{
+          codigoPais:state.codigoPais,telefono:state.telefono,nombre:state.nombre,apellido:state.apellido,
+          cumpleDia:state.nuevoCumpleDia,cumpleMes:state.nuevoCumpleMes,privacidadAceptada:true
+        }]);
+      }catch(e){console.warn("Reserva creada; solicitud de cumpleaños no enviada",e);}
     }
-
-  }
-
+    state.cargando=false;setStep(4);
+  }catch(e){state.cargando=false;err(e);renderRevision();}
 }
 
-
-
-
-// ============================================================
-// CLIENTES + PRIVACIDAD + TELEFONOS INTERNACIONALES — FASE 1
-// ============================================================
-
-const CLIENTES_SHEET = 'Clientes';
-const SOLICITUDES_ACTUALIZACION_SHEET = 'SolicitudesActualizacion';
-const HISTORIAL_ACCIONES_SHEET = 'HistorialAcciones';
-
-const CLIENTES_HEADERS = [
-  'IDCliente','TelefonoE164','CodigoPais','TelefonoLocal','Nombre','Apellido',
-  'CumpleDia','CumpleMes','AlergiasHabituales','ConsentimientoAlergias',
-  'ConsentimientoMarketing','FechaConsentimientoMarketing',
-  'ConsentimientoPrivacidad','FechaConsentimientoPrivacidad',
-  'FechaPrimeraReserva','FechaUltimaReserva','CantidadReservas','CantidadNoShow',
-  'Activo','Creado','Actualizado'
-];
-
-const SOLICITUDES_HEADERS = [
-  'IDSolicitud','IDCliente','TelefonoE164','Nombre','Apellido','TipoDato',
-  'ValorActual','ValorSolicitado','FechaSolicitud','Estado',
-  'ResueltoPor','FechaResolucion','Observacion'
-];
-
-const HISTORIAL_HEADERS = [
-  'IDEvento','FechaHora','Usuario','Rol','Accion','Entidad','IDEntidad',
-  'ValorAnterior','ValorNuevo','Observacion'
-];
-
-const RESERVAS_CLIENTE_EXTRA_HEADERS = [
-  'IDCliente','Apellido cliente','Codigo pais','Telefono E164',
-  'Cumple dia','Cumple mes','Consentimiento marketing',
-  'Consentimiento privacidad','Consentimiento alergias futuras','Canal',
-  'Observaciones cliente'
-];
-
-function asegurarHojaConHeaders_(nombre, headers) {
-  const ss = getSS();
-  let sheet = ss.getSheetByName(nombre);
-  if (!sheet) {
-    sheet = ss.insertSheet(nombre);
-    sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    return sheet;
-  }
-
-  if (sheet.getLastRow() === 0) {
-    sheet.getRange(1,1,1,headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    return sheet;
-  }
-
-  const existentes = sheet.getRange(1,1,1,Math.max(1,sheet.getLastColumn())).getValues()[0]
-    .map(v => String(v || '').trim());
-  const faltantes = headers.filter(h => existentes.indexOf(h) === -1);
-
-  faltantes.forEach(h => {
-    sheet.getRange(1, sheet.getLastColumn() + 1).setValue(h);
-  });
-  sheet.setFrozenRows(1);
-  return sheet;
+function renderConfirmacion(){
+  app.innerHTML=`
+    <div class="success">
+      <div class="icon">✓</div>
+      <h1>¡Reserva confirmada!</h1>
+      <p class="lead">Gracias, ${esc(state.nombre)}. Tu mesa quedó registrada.</p>
+    </div>
+    <div class="card">
+      <div class="summary">
+        <div><small>Código</small><strong>${esc(state.resultado&&state.resultado.id)}</strong></div>
+        <div><small>Personas</small><strong>${state.personas}</strong></div>
+        <div><small>Fecha</small><strong>${esc(state.fechaLabel||state.fecha)}</strong></div>
+        <div><small>Hora</small><strong>${esc(state.hora.replace("pm"," pm"))}</strong></div>
+        <div><small>Espacio</small><strong>${esc(state.espacio)}</strong></div>
+      </div>
+      <div class="note" style="margin-top:12px">Te enviamos la confirmación al correo registrado.</div>
+      ${state.solicitarCumple?`<div class="alert ok">También enviamos tu solicitud de actualización de cumpleaños a Administración.</div>`:""}
+    </div>
+  `;
 }
-
-function asegurarColumnasReservasClientes_() {
-  const sheet = getSheet('Reservas');
-  if (!sheet) throw new Error('No existe la hoja Reservas.');
-
-  const headers = sheet.getRange(1,1,1,Math.max(1,sheet.getLastColumn())).getValues()[0]
-    .map(v => String(v || '').trim());
-
-  RESERVAS_CLIENTE_EXTRA_HEADERS.forEach(h => {
-    if (headers.indexOf(h) === -1) {
-      sheet.getRange(1, sheet.getLastColumn() + 1).setValue(h);
-      headers.push(h);
-    }
-  });
-  return sheet;
-}
-
-function inicializarFaseClientesBaranBlu() {
-  asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-  asegurarHojaConHeaders_(SOLICITUDES_ACTUALIZACION_SHEET, SOLICITUDES_HEADERS);
-  asegurarHojaConHeaders_(HISTORIAL_ACCIONES_SHEET, HISTORIAL_HEADERS);
-  asegurarColumnasReservasClientes_();
-
-  return {
-    exito: true,
-    mensaje: 'Fase Clientes inicializada. No se modificaron reservas históricas.',
-    hojas: [CLIENTES_SHEET, SOLICITUDES_ACTUALIZACION_SHEET, HISTORIAL_ACCIONES_SHEET],
-    columnasReservasAgregadas: RESERVAS_CLIENTE_EXTRA_HEADERS
-  };
-}
-
-function normalizarCodigoPais_(valor) {
-  let s = String(valor || '').trim();
-  if (!s) s = '+507';
-  s = s.replace(/[^\d+]/g, '');
-  if (s.charAt(0) !== '+') s = '+' + s.replace(/\D/g, '');
-  if (!/^\+\d{1,4}$/.test(s)) {
-    throw new Error('Código de país inválido.');
-  }
-  return s;
-}
-
-function normalizarTelefonoE164_(codigoPais, telefono) {
-  let raw = String(telefono || '').trim();
-  if (!raw) throw new Error('Ingresa un número de teléfono.');
-
-  // Si el cliente ya escribió +<pais>, respetarlo.
-  if (raw.charAt(0) === '+') {
-    const completo = '+' + raw.replace(/\D/g, '');
-    const digitos = completo.replace(/\D/g, '');
-    if (digitos.length < 7 || digitos.length > 15) {
-      throw new Error('Número de teléfono inválido.');
-    }
-    return completo;
-  }
-
-  const codigo = normalizarCodigoPais_(codigoPais);
-  let local = raw.replace(/\D/g, '');
-
-  // Evita duplicar el country code si fue escrito sin +.
-  const codigoDigitos = codigo.replace(/\D/g, '');
-  if (local.indexOf(codigoDigitos) === 0 && local.length > codigoDigitos.length + 5) {
-    local = local.slice(codigoDigitos.length);
-  }
-
-  const completo = codigo + local;
-  const digitos = completo.replace(/\D/g, '');
-  if (digitos.length < 7 || digitos.length > 15) {
-    throw new Error('Número de teléfono inválido.');
-  }
-  return completo;
-}
-
-function normalizarTextoIdentidad_(valor) {
-  return String(valor || '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ');
-}
-
-function validarNombreApellido_(nombre, apellido) {
-  const n = String(nombre || '').trim();
-  const a = String(apellido || '').trim();
-  if (n.length < 2) throw new Error('Ingresa tu nombre.');
-  if (a.length < 2) throw new Error('Ingresa tu apellido.');
-  return { nombre:n, apellido:a };
-}
-
-function validarCumple_(dia, mes) {
-  if ((dia === '' || dia == null) && (mes === '' || mes == null)) {
-    return { dia:'', mes:'' };
-  }
-  const d = Number(dia);
-  const m = Number(mes);
-  if (!Number.isInteger(d) || !Number.isInteger(m) || m < 1 || m > 12) {
-    throw new Error('Fecha de cumpleaños inválida.');
-  }
-  const max = new Date(2024, m, 0).getDate(); // 2024 cubre 29/feb
-  if (d < 1 || d > max) throw new Error('Fecha de cumpleaños inválida.');
-  return { dia:d, mes:m };
-}
-
-function mapaHeaders_(sheet) {
-  const headers = sheet.getRange(1,1,1,Math.max(1,sheet.getLastColumn())).getValues()[0];
-  const idx = {};
-  headers.forEach((h,i) => idx[String(h || '').trim()] = i);
-  return { headers:headers, idx:idx };
-}
-
-function filaAObjeto_(headers, row) {
-  const obj = {};
-  headers.forEach((h,i) => obj[String(h || '').trim()] = row[i]);
-  return obj;
-}
-
-function generarIDCliente_() {
-  return 'CL-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss') +
-    '-' + Utilities.getUuid().replace(/-/g,'').slice(0,6).toUpperCase();
-}
-
-function generarIDSolicitud_() {
-  return 'SA-' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMddHHmmss') +
-    '-' + Utilities.getUuid().replace(/-/g,'').slice(0,5).toUpperCase();
-}
-
-function registrarHistorial_(usuario, rol, accion, entidad, idEntidad, anterior, nuevo, observacion) {
-  const sheet = asegurarHojaConHeaders_(HISTORIAL_ACCIONES_SHEET, HISTORIAL_HEADERS);
-  sheet.appendRow([
-    'EV-' + Utilities.getUuid().replace(/-/g,'').slice(0,12).toUpperCase(),
-    new Date(),
-    usuario || 'Sistema',
-    rol || 'SISTEMA',
-    accion || '',
-    entidad || '',
-    idEntidad || '',
-    anterior == null ? '' : String(anterior),
-    nuevo == null ? '' : String(nuevo),
-    observacion || ''
-  ]);
-}
-
-function buscarClientesPorTelefonoInterno_(telefonoE164) {
-  const sheet = asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-  if (sheet.getLastRow() < 2) return [];
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(v => String(v || '').trim());
-  const idx = {};
-  headers.forEach((h,i) => idx[h] = i);
-
-  return data.slice(1).map((row,offset) => ({
-    fila: offset + 2,
-    obj: filaAObjeto_(headers,row)
-  })).filter(x =>
-    String(x.obj.TelefonoE164 || '') === telefonoE164 &&
-    String(x.obj.Activo || 'Sí').trim().toLowerCase() !== 'no'
-  );
-}
-
-function buscarClienteExactoInterno_(telefonoE164, nombre, apellido) {
-  const nn = normalizarTextoIdentidad_(nombre);
-  const aa = normalizarTextoIdentidad_(apellido);
-  const candidatos = buscarClientesPorTelefonoInterno_(telefonoE164);
-
-  return candidatos.find(x =>
-    normalizarTextoIdentidad_(x.obj.Nombre) === nn &&
-    normalizarTextoIdentidad_(x.obj.Apellido) === aa
-  ) || null;
-}
-
-// Respuesta pública deliberadamente mínima: no lista personas ni expone cumpleaños/alergias.
-function buscarClientePublico(codigoPais, telefono) {
-  const e164 = normalizarTelefonoE164_(codigoPais, telefono);
-  const candidatos = buscarClientesPorTelefonoInterno_(e164);
-
-  if (candidatos.length === 0) {
-    return { tipo:'NUEVO', encontrados:0 };
-  }
-
-  if (candidatos.length === 1) {
-    return {
-      tipo:'UNICO',
-      encontrados:1,
-      nombre: String(candidatos[0].obj.Nombre || '').trim(),
-      cumpleRegistrado: !!(candidatos[0].obj.CumpleDia && candidatos[0].obj.CumpleMes)
-    };
-  }
-
-  return {
-    tipo:'COMPARTIDO',
-    encontrados:candidatos.length,
-    mensaje:'Este número está asociado a más de una persona. Ingresa tu nombre y apellido para continuar.'
-  };
-}
-
-function identificarClienteCompartidoPublico(codigoPais, telefono, nombre, apellido) {
-  const identidad = validarNombreApellido_(nombre, apellido);
-  const e164 = normalizarTelefonoE164_(codigoPais, telefono);
-  const exacto = buscarClienteExactoInterno_(e164, identidad.nombre, identidad.apellido);
-
-  if (!exacto) return { reconocido:false, tipo:'NUEVO_EN_TELEFONO_COMPARTIDO' };
-
-  return {
-    reconocido:true,
-    tipo:'RECONOCIDO',
-    nombre:String(exacto.obj.Nombre || '').trim(),
-    cumpleRegistrado: !!(exacto.obj.CumpleDia && exacto.obj.CumpleMes)
-  };
-}
-
-function crearClienteDesdeReserva_(datos, telefonoE164, identidad, cumple) {
-  const sheet = asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-  const ahora = new Date();
-  const idCliente = generarIDCliente_();
-  const alergias = datos.guardarAlergias ? String(datos.alergias || '').trim() : '';
-
-  sheet.appendRow([
-    idCliente,
-    telefonoE164,
-    normalizarCodigoPais_(datos.codigoPais || '+507'),
-    String(datos.telefono || '').trim(),
-    identidad.nombre,
-    identidad.apellido,
-    cumple.dia,
-    cumple.mes,
-    alergias,
-    datos.guardarAlergias ? 'Sí' : 'No',
-    datos.consentimientoMarketing ? 'Sí' : 'No',
-    datos.consentimientoMarketing ? ahora : '',
-    'Sí',
-    ahora,
-    ahora,
-    ahora,
-    1,
-    0,
-    'Sí',
-    ahora,
-    ahora
-  ]);
-
-  registrarHistorial_('Cliente','PUBLICO','CREAR_CLIENTE','Cliente',idCliente,'','',
-    'Creado desde reserva pública.');
-
-  return { idCliente:idCliente, nuevo:true };
-}
-
-function actualizarClienteDesdeReserva_(cliente, datos, cumple) {
-  const sheet = asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-  const mapa = mapaHeaders_(sheet);
-  const obj = cliente.obj;
-  const ahora = new Date();
-
-  function setCampo(header, value) {
-    if (mapa.idx[header] == null) return;
-    sheet.getRange(cliente.fila, mapa.idx[header] + 1).setValue(value);
-  }
-
-  // Cumpleaños: solo completar si todavía no existe. Nunca reemplazar automáticamente.
-  if (!obj.CumpleDia && !obj.CumpleMes && cumple.dia && cumple.mes) {
-    setCampo('CumpleDia', cumple.dia);
-    setCampo('CumpleMes', cumple.mes);
-  }
-
-  if (datos.guardarAlergias) {
-    setCampo('AlergiasHabituales', String(datos.alergias || '').trim());
-    setCampo('ConsentimientoAlergias', 'Sí');
-  }
-
-  if (datos.consentimientoMarketing && String(obj.ConsentimientoMarketing || '').toLowerCase() !== 'sí') {
-    setCampo('ConsentimientoMarketing', 'Sí');
-    setCampo('FechaConsentimientoMarketing', ahora);
-  }
-
-  setCampo('ConsentimientoPrivacidad', 'Sí');
-  if (!obj.FechaConsentimientoPrivacidad) setCampo('FechaConsentimientoPrivacidad', ahora);
-  setCampo('FechaUltimaReserva', ahora);
-  setCampo('CantidadReservas', Number(obj.CantidadReservas || 0) + 1);
-  setCampo('Actualizado', ahora);
-
-  return { idCliente:String(obj.IDCliente || ''), nuevo:false };
-}
-
-function obtenerOCrearClienteParaReserva_(datos) {
-  const identidad = validarNombreApellido_(datos.nombre, datos.apellido);
-  const telefonoE164 = normalizarTelefonoE164_(datos.codigoPais, datos.telefono);
-  const cumple = validarCumple_(datos.cumpleDia, datos.cumpleMes);
-
-  const exacto = buscarClienteExactoInterno_(telefonoE164, identidad.nombre, identidad.apellido);
-  const cliente = exacto
-    ? actualizarClienteDesdeReserva_(exacto, datos, cumple)
-    : crearClienteDesdeReserva_(datos, telefonoE164, identidad, cumple);
-
-  return {
-    idCliente: cliente.idCliente,
-    nuevo: cliente.nuevo,
-    telefonoE164: telefonoE164,
-    identidad: identidad,
-    cumple: cumple
-  };
-}
-
-function escribirExtrasReservaCliente_(idReserva, clienteInfo, datos) {
-  const sheet = asegurarColumnasReservasClientes_();
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(v => String(v || '').trim());
-  const idx = {};
-  headers.forEach((h,i) => idx[h] = i);
-
-  let fila = -1;
-  for (let i = data.length - 1; i >= 1; i--) {
-    if (String(data[i][idx['ID']]) === String(idReserva)) {
-      fila = i + 1;
-      break;
-    }
-  }
-  if (fila < 0) throw new Error('No se encontró la reserva recién creada.');
-
-  const valores = {
-    'IDCliente': clienteInfo.idCliente,
-    'Apellido cliente': clienteInfo.identidad.apellido,
-    'Codigo pais': normalizarCodigoPais_(datos.codigoPais || '+507'),
-    'Telefono E164': clienteInfo.telefonoE164,
-    'Cumple dia': clienteInfo.cumple.dia,
-    'Cumple mes': clienteInfo.cumple.mes,
-    'Consentimiento marketing': datos.consentimientoMarketing ? 'Sí' : 'No',
-    'Consentimiento privacidad': 'Sí',
-    'Consentimiento alergias futuras': datos.guardarAlergias ? 'Sí' : 'No',
-    'Canal': datos.canal || 'Web',
-    'Observaciones cliente': String(datos.observaciones || '').trim()
-  };
-
-  Object.keys(valores).forEach(h => {
-    if (idx[h] != null) sheet.getRange(fila, idx[h] + 1).setValue(valores[h]);
-  });
-}
-
-function crearReservaV2(datos) {
-  if (!datos || datos.privacidadAceptada !== true) {
-    return {
-      exito:false,
-      mensaje:'Debes aceptar la Política de Privacidad para continuar.'
-    };
-  }
-
-  const identidad = validarNombreApellido_(datos.nombre, datos.apellido);
-
-  // Valida antes de crear la reserva.
-  normalizarTelefonoE164_(datos.codigoPais, datos.telefono);
-  validarCumple_(datos.cumpleDia, datos.cumpleMes);
-
-  // Conserva el motor actual sin tocar sus reglas.
-  const legacy = Object.assign({}, datos, {
-    nombre: identidad.nombre + ' ' + identidad.apellido,
-    metodoPago: 'Sin pago'
-  });
-
-  const resultado = crearReserva(legacy);
-  if (!resultado || !resultado.exito) return resultado;
-
-  // A partir de aquí la reserva YA existe. Si la capa de Clientes falla,
-  // no devolvemos un error que pueda provocar que el cliente reserve dos veces.
-  try {
-    const clienteInfo = obtenerOCrearClienteParaReserva_(datos);
-    escribirExtrasReservaCliente_(resultado.id, clienteInfo, datos);
-
-    registrarHistorial_(
-      'Cliente','PUBLICO','CREAR_RESERVA','Reserva',resultado.id,'','',
-      'Reserva creada con Web pública V2. IDCliente: ' + clienteInfo.idCliente
-    );
-
-    resultado.idCliente = clienteInfo.idCliente;
-    resultado.clienteNuevo = clienteInfo.nuevo;
-  } catch (errorCliente) {
-    resultado.avisoCliente = 'La reserva quedó confirmada, pero la ficha de cliente requiere revisión administrativa.';
-    try {
-      registrarHistorial_(
-        'Sistema','SISTEMA','ERROR_SINCRONIZAR_CLIENTE','Reserva',resultado.id,'','',
-        errorCliente && errorCliente.message ? errorCliente.message : String(errorCliente)
-      );
-    } catch (e) {}
-  }
-
-  return resultado;
-}
-
-function solicitarCorreccionCumplePublica(datos) {
-  if (!datos || datos.privacidadAceptada !== true) {
-    return { exito:false, mensaje:'Debes aceptar la Política de Privacidad.' };
-  }
-
-  const identidad = validarNombreApellido_(datos.nombre, datos.apellido);
-  const telefonoE164 = normalizarTelefonoE164_(datos.codigoPais, datos.telefono);
-  const nuevo = validarCumple_(datos.cumpleDia, datos.cumpleMes);
-  if (!nuevo.dia || !nuevo.mes) {
-    return { exito:false, mensaje:'Indica el cumpleaños correcto.' };
-  }
-
-  const exacto = buscarClienteExactoInterno_(telefonoE164, identidad.nombre, identidad.apellido);
-  if (!exacto) {
-    return { exito:false, mensaje:'No pudimos identificar el perfil para solicitar el cambio.' };
-  }
-
-  const actual = (exacto.obj.CumpleDia && exacto.obj.CumpleMes)
-    ? String(exacto.obj.CumpleDia).padStart(2,'0') + '/' + String(exacto.obj.CumpleMes).padStart(2,'0')
-    : 'Sin registrar';
-  const solicitado = String(nuevo.dia).padStart(2,'0') + '/' + String(nuevo.mes).padStart(2,'0');
-  const sheet = asegurarHojaConHeaders_(SOLICITUDES_ACTUALIZACION_SHEET, SOLICITUDES_HEADERS);
-  const id = generarIDSolicitud_();
-
-  sheet.appendRow([
-    id,
-    exacto.obj.IDCliente,
-    telefonoE164,
-    identidad.nombre,
-    identidad.apellido,
-    'Cumpleaños',
-    actual,
-    solicitado,
-    new Date(),
-    'Pendiente',
-    '',
-    '',
-    ''
-  ]);
-
-  registrarHistorial_('Cliente','PUBLICO','SOLICITAR_CAMBIO_CUMPLE','Cliente',
-    exacto.obj.IDCliente,actual,solicitado,'Solicitud ' + id);
-
-  return { exito:true, idSolicitud:id, mensaje:'Solicitud enviada a Administración.' };
-}
-
-function getSolicitudesActualizacionStaff(token) {
-  requerirSesionStaff_(token, 'ADMIN');
-  const sheet = asegurarHojaConHeaders_(SOLICITUDES_ACTUALIZACION_SHEET, SOLICITUDES_HEADERS);
-  if (sheet.getLastRow() < 2) return [];
-
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(v => String(v || '').trim());
-
-  return data.slice(1).map((row, i) => {
-    const obj = filaAObjeto_(headers, row);
-    obj._fila = i + 2;
-    return obj;
-  }).filter(x => String(x.Estado || '') === 'Pendiente').reverse();
-}
-
-function resolverSolicitudActualizacion(token, idSolicitud, aprobar, observacion) {
-  const sesion = requerirSesionStaff_(token, 'ADMIN');
-  const sheet = asegurarHojaConHeaders_(SOLICITUDES_ACTUALIZACION_SHEET, SOLICITUDES_HEADERS);
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0].map(v => String(v || '').trim());
-  const idx = {};
-  headers.forEach((h,i) => idx[h] = i);
-
-  let fila = -1;
-  let solicitud = null;
-  for (let i=1;i<data.length;i++) {
-    if (String(data[i][idx['IDSolicitud']]) === String(idSolicitud)) {
-      fila = i+1;
-      solicitud = filaAObjeto_(headers,data[i]);
-      break;
-    }
-  }
-  if (fila < 0) return { exito:false, mensaje:'Solicitud no encontrada.' };
-  if (String(solicitud.Estado) !== 'Pendiente') {
-    return { exito:false, mensaje:'La solicitud ya fue resuelta.' };
-  }
-
-  if (aprobar && String(solicitud.TipoDato) === 'Cumpleaños') {
-    const partes = String(solicitud.ValorSolicitado || '').split('/');
-    const nuevo = validarCumple_(partes[0],partes[1]);
-
-    const clientes = asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-    const cdata = clientes.getDataRange().getValues();
-    const ch = cdata[0].map(v => String(v || '').trim());
-    const cidx = {};
-    ch.forEach((h,i)=>cidx[h]=i);
-
-    let cfila = -1;
-    for (let i=1;i<cdata.length;i++) {
-      if (String(cdata[i][cidx['IDCliente']]) === String(solicitud.IDCliente)) {
-        cfila = i+1; break;
-      }
-    }
-    if (cfila < 0) throw new Error('Cliente asociado no encontrado.');
-
-    clientes.getRange(cfila,cidx['CumpleDia']+1).setValue(nuevo.dia);
-    clientes.getRange(cfila,cidx['CumpleMes']+1).setValue(nuevo.mes);
-    clientes.getRange(cfila,cidx['Actualizado']+1).setValue(new Date());
-  }
-
-  sheet.getRange(fila,idx['Estado']+1).setValue(aprobar ? 'Aprobada' : 'Rechazada');
-  sheet.getRange(fila,idx['ResueltoPor']+1).setValue(sesion.usuario);
-  sheet.getRange(fila,idx['FechaResolucion']+1).setValue(new Date());
-  sheet.getRange(fila,idx['Observacion']+1).setValue(observacion || '');
-
-  registrarHistorial_(sesion.usuario,sesion.rol,
-    aprobar ? 'APROBAR_SOLICITUD' : 'RECHAZAR_SOLICITUD',
-    'SolicitudActualizacion',idSolicitud,solicitud.ValorActual,solicitud.ValorSolicitado,observacion || '');
-
-  return { exito:true, mensaje: aprobar ? 'Actualización aprobada.' : 'Solicitud rechazada.' };
-}
-
-function getCumpleanerosHoyStaff(token) {
-  requerirSesionStaff_(token);
-  const clientes = asegurarHojaConHeaders_(CLIENTES_SHEET, CLIENTES_HEADERS);
-  if (clientes.getLastRow() < 2) return [];
-
-  const ahora = new Date();
-  const dia = Number(Utilities.formatDate(ahora, Session.getScriptTimeZone(), 'd'));
-  const mes = Number(Utilities.formatDate(ahora, Session.getScriptTimeZone(), 'M'));
-  const fechaHoy = Utilities.formatDate(ahora, Session.getScriptTimeZone(), 'yyyy-MM-dd');
-
-  const cdata = clientes.getDataRange().getValues();
-  const ch = cdata[0].map(v => String(v || '').trim());
-  const cidx = {};
-  ch.forEach((h,i)=>cidx[h]=i);
-
-  const reservas = getSheet('Reservas').getDataRange().getValues();
-  const rh = reservas[0].map(v => String(v || '').trim());
-  const ridx = {};
-  rh.forEach((h,i)=>ridx[h]=i);
-
-  const reservaPorCliente = {};
-  if (ridx['IDCliente'] != null) {
-    for (let i=1;i<reservas.length;i++) {
-      if (normalizarFecha(reservas[i][ridx['Fecha']]) !== fechaHoy) continue;
-      const estado = String(reservas[i][ridx['Estado']] || '');
-      if (['Cancelada','No-show'].indexOf(estado) !== -1) continue;
-      const idc = String(reservas[i][ridx['IDCliente']] || '');
-      if (idc) reservaPorCliente[idc] = reservas[i][ridx['Hora']];
-    }
-  }
-
-  const salida = [];
-  for (let i=1;i<cdata.length;i++) {
-    if (Number(cdata[i][cidx['CumpleDia']]) !== dia || Number(cdata[i][cidx['CumpleMes']]) !== mes) continue;
-    if (String(cdata[i][cidx['Activo']] || 'Sí').toLowerCase() === 'no') continue;
-
-    const idc = String(cdata[i][cidx['IDCliente']] || '');
-    salida.push({
-      idCliente:idc,
-      nombre:String(cdata[i][cidx['Nombre']] || ''),
-      apellido:String(cdata[i][cidx['Apellido']] || ''),
-      reservaHoy: reservaPorCliente[idc] ? true : false,
-      horaReserva: reservaPorCliente[idc] || ''
-    });
-  }
-  return salida;
-}
-
-function previsualizarMigracionClientesHistoricos() {
-  const sheet = getSheet('Reservas');
-  const data = sheet.getDataRange().getValues();
-  if (data.length < 2) return { totalReservas:0, conTelefono:0, candidatosUnicos:0, ambiguos:0 };
-
-  const headers = data[0].map(v => String(v || '').trim());
-  const idx = {};
-  headers.forEach((h,i)=>idx[h]=i);
-
-  const grupos = {};
-  let conTelefono = 0;
-  for (let i=1;i<data.length;i++) {
-    const tel = String(data[i][idx['Teléfono']] || '').trim();
-    const nombre = String(data[i][idx['Nombre cliente']] || '').trim();
-    if (!tel || !nombre) continue;
-
-    let normalizado = '';
-    try {
-      normalizado = normalizarTelefonoE164_('+507',tel);
-    } catch(e) {
-      normalizado = tel.replace(/\D/g,'');
-    }
-    conTelefono++;
-    const key = normalizado + '|' + normalizarTextoIdentidad_(nombre);
-    if (!grupos[key]) grupos[key] = {telefono:normalizado,nombre:nombre,cantidad:0};
-    grupos[key].cantidad++;
-  }
-
-  const porTelefono = {};
-  Object.keys(grupos).forEach(k => {
-    const g = grupos[k];
-    if (!porTelefono[g.telefono]) porTelefono[g.telefono] = [];
-    porTelefono[g.telefono].push(g.nombre);
-  });
-
-  let ambiguos = 0;
-  Object.keys(porTelefono).forEach(t => {
-    const nombres = Array.from(new Set(porTelefono[t].map(normalizarTextoIdentidad_)));
-    if (nombres.length > 1) ambiguos++;
-  });
-
-  return {
-    totalReservas: data.length - 1,
-    conTelefono: conTelefono,
-    candidatosUnicos: Object.keys(grupos).length,
-    telefonosCompartidosOAambiguos: ambiguos,
-    nota:'Solo previsualiza. No modifica reservas ni crea clientes.'
-  };
-}
-
-function pruebaPresionClientesPrivacidad() {
-  const resultados = [];
-
-  function test(nombre, fn) {
-    try {
-      const ok = !!fn();
-      resultados.push({nombre:nombre, ok:ok});
-    } catch(e) {
-      resultados.push({nombre:nombre, ok:false, error:String(e && e.message ? e.message : e)});
-    }
-  }
-
-  test('Panamá +507 normaliza', () => normalizarTelefonoE164_('+507','6000-1234') === '+50760001234');
-  test('Número con + se respeta', () => normalizarTelefonoE164_('+507','+34 612 34 56 78') === '+34612345678');
-  test('Country code no se duplica', () => normalizarTelefonoE164_('+507','50760001234') === '+50760001234');
-  test('Nombre y apellido obligatorios', () => {
-    try { validarNombreApellido_('María',''); return false; } catch(e) { return true; }
-  });
-  test('Cumpleaños vacío permitido', () => {
-    const x = validarCumple_('',''); return x.dia === '' && x.mes === '';
-  });
-  test('29 febrero permitido', () => {
-    const x = validarCumple_(29,2); return x.dia === 29 && x.mes === 2;
-  });
-  test('31 febrero rechazado', () => {
-    try { validarCumple_(31,2); return false; } catch(e) { return true; }
-  });
-  test('Identidad ignora tildes/mayúsculas', () =>
-    normalizarTextoIdentidad_('  María José ') === 'maria jose'
-  );
-  test('Privacidad requerida V2', () => {
-    const r = crearReservaV2({privacidadAceptada:false});
-    return r && r.exito === false;
-  });
-
-  const fallos = resultados.filter(x => !x.ok);
-  resultados.forEach(r => Logger.log('CLIENTES/PRIVACIDAD | %s | %s%s',
-    r.nombre, r.ok ? 'PASS' : 'FAIL', r.error ? ' | ' + r.error : ''));
-
-  Logger.log(fallos.length === 0
-    ? 'PRUEBA CLIENTES/PRIVACIDAD: PASS'
-    : 'PRUEBA CLIENTES/PRIVACIDAD: FAIL (' + fallos.length + ')');
-
-  return { exito:fallos.length===0, fallos:fallos.length, totalCasos:resultados.length, resultados:resultados };
-}
-
-
-// ============================================================
-
-// ENDPOINTS WEB + API PARA GITHUB PAGES
-
-// ============================================================
-
-
-
-function jsonResponse_(objeto) {
-
-  return ContentService
-
-    .createTextOutput(JSON.stringify(objeto))
-
-    .setMimeType(ContentService.MimeType.JSON);
-
-}
-
-
-
-function doGet(e) {
-
-  const params = (e && e.parameter) ? e.parameter : {};
-
-  const api = params.api || '';
-
-
-
-  if (api) {
-
-    try {
-
-      if (api === 'requiereDeposito') {
-
-        return jsonResponse_({ ok: true, data: getRequiereDeposito() });
-
-      }
-
-
-
-      if (api === 'whatsapp') {
-
-        return jsonResponse_({ ok: true, data: getWhatsappNumero() });
-
-      }
-
-      if (api === 'cierres') {
-        return jsonResponse_({ ok: true, data: getFechasCerradasPublicas() });
-      }
-
-      if (api === 'clienteLookup') {
-        return jsonResponse_({
-          ok: true,
-          data: buscarClientePublico(params.codigoPais || '+507', params.telefono || '')
-        });
-      }
-
-      if (api === 'clienteIdentificar') {
-        return jsonResponse_({
-          ok: true,
-          data: identificarClienteCompartidoPublico(
-            params.codigoPais || '+507',
-            params.telefono || '',
-            params.nombre || '',
-            params.apellido || ''
-          )
-        });
-      }
-
-
-
-      if (api === 'disponibilidad') {
-
-        const fecha = params.fecha || '';
-
-        const hora = params.hora || '';
-
-        const personas = Number(params.personas || 0);
-
-
-
-        if (!fecha || !hora || !personas) {
-
-          return jsonResponse_({
-
-            ok: false,
-
-            error: 'Faltan fecha, hora o personas.'
-
-          });
-
-        }
-
-
-
-        return jsonResponse_({
-
-          ok: true,
-
-          data: getDisponibilidad(fecha, hora, personas)
-
-        });
-
-      }
-
-
-
-      return jsonResponse_({ ok: false, error: 'Acción API no reconocida.' });
-
-
-
-    } catch (error) {
-
-      return jsonResponse_({
-
-        ok: false,
-
-        error: error && error.message ? error.message : String(error)
-
-      });
-
-    }
-
-  }
-
-
-
-  const page = params.page;
-
-  const template = HtmlService.createTemplateFromFile(
-
-    page === 'staff' ? 'Staff' : 'Index'
-
-  );
-
-
-
-  return template.evaluate()
-
-    .setTitle('Baran Blü — Reservas')
-
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-
-}
-
-
-
-function doPost(e) {
-
-  try {
-
-    const texto = e && e.postData && e.postData.contents
-
-      ? e.postData.contents
-
-      : '{}';
-
-
-
-    const payload = JSON.parse(texto);
-
-    const accion = payload.action || '';
-
-
-
-    if (accion === 'crearReserva') {
-
-      const datos = payload.data || {};
-
-
-
-      if (
-
-        !datos.fecha ||
-
-        !datos.hora ||
-
-        !datos.espacio ||
-
-        !datos.personas ||
-
-        !datos.nombre ||
-
-        !datos.telefono ||
-
-        !datos.correo
-
-      ) {
-
-        return jsonResponse_({
-
-          ok: false,
-
-          error: 'Faltan datos requeridos para crear la reserva.'
-
-        });
-
-      }
-
-
-
-      return jsonResponse_({
-
-        ok: true,
-
-        data: crearReserva(datos)
-
-      });
-
-    }
-
-    if (accion === 'crearReservaV2') {
-      const datos = payload.data || {};
-      return jsonResponse_({
-        ok: true,
-        data: crearReservaV2(datos)
-      });
-    }
-
-    if (accion === 'solicitarCorreccionCumple') {
-      const datos = payload.data || {};
-      return jsonResponse_({
-        ok: true,
-        data: solicitarCorreccionCumplePublica(datos)
-      });
-    }
-
-
-
-    return jsonResponse_({
-
-      ok: false,
-
-      error: 'Acción POST no reconocida.'
-
-    });
-
-
-
-  } catch (error) {
-
-    return jsonResponse_({
-
-      ok: false,
-
-      error: error && error.message ? error.message : String(error)
-
-    });
-
-  }
-
-}
-
-
-
-function include(filename) {
-
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
-
-}
-
- function probarReservaSinPago() {
-
-  const resultado = crearReserva({
-
-    fecha: '2026-08-20',
-
-    hora: '6:00pm',
-
-    espacio: 'Sala',
-
-    personas: 2,
-
-    nombre: 'Prueba Sin Pago',
-
-    telefono: '+50760009999',
-
-    correo: 'prueba@ejemplo.com',
-
-    alergias: '',
-
-    ocasion: '',
-
-    metodoPago: 'Sin pago'
-
-  });
-
-  Logger.log(resultado);
-
-}
-
-function probarRequiereDeposito() {
-
-  Logger.log(getRequiereDeposito());
-
-}
-
-function probarStaffBackend() {
-
-  const sheet = getSheet('Reservas');
-
-  const data = sheet.getDataRange().getDisplayValues();
-
-
-
-  Logger.log('=== DIAGNÓSTICO STAFF ===');
-
-  Logger.log('Nombre hoja: ' + sheet.getName());
-
-  Logger.log('Cantidad de filas incluyendo encabezado: ' + data.length);
-
-  Logger.log('Encabezados: ' + JSON.stringify(data[0]));
-
-
-
-  if (data.length > 1) {
-
-    Logger.log('Última fila del Sheet: ' + JSON.stringify(data[data.length - 1]));
-
-  }
-
-
-
-  const resultado = getReservasParaPanel();
-
-
-
-  Logger.log('Reservas devueltas al Staff: ' + resultado.length);
-
-
-
-  if (resultado.length > 0) {
-
-    Logger.log(
-
-      'Primera reserva enviada al Staff: ' +
-
-      JSON.stringify(resultado[0])
-
-    );
-
-  }
-
-
-
-  Logger.log('=== FIN DIAGNÓSTICO ===');
-
-}
+render();
+})();
+</script>
+</body>
+</html>
