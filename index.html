@@ -104,6 +104,51 @@ textarea{min-height:84px;resize:vertical}
 .success{text-align:center;padding:18px 0}
 .success .icon{width:64px;height:64px;border-radius:50%;background:var(--platano);color:white;display:grid;place-items:center;margin:0 auto 14px;font-size:30px}
 @media(max-width:410px){.name-grid,.spaces{grid-template-columns:1fr}.phone-grid{grid-template-columns:96px 1fr}}
+
+/* ===== Baran Blü V3 — refinamiento visual aprobado ===== */
+.shell{max-width:560px;background:#FBF6ED}
+.header{padding:22px 24px 17px;background:linear-gradient(145deg,#321A29,#452637)}
+.header:before{content:"";position:absolute;left:-55px;top:-90px;width:210px;height:210px;border:1px solid rgba(178,169,145,.16);border-radius:50%}
+.brand-logo{max-width:245px;width:68%;position:relative;z-index:2}
+.header-sub{font-size:13px;position:relative;z-index:2;color:#F2E8DD}
+.main{padding:22px 24px 28px}
+.progress{gap:9px;margin-bottom:21px}
+.progress span{height:5px;background:#DDD1C2}.progress span.on{background:#8F3D36}
+.step-kicker{color:#9A4039;font-size:12px;letter-spacing:.07em}
+h1{font-size:31px;letter-spacing:-.02em}.lead{font-size:14px;max-width:470px}
+.card{border-radius:19px;border-color:#E2D7C8;box-shadow:0 7px 22px rgba(55,31,47,.045);padding:18px}
+.btn{background:linear-gradient(135deg,#5B1930,#371F2F);border-radius:13px;box-shadow:0 5px 13px rgba(55,31,47,.12)}
+.btn.secondary{box-shadow:none;background:#fff}
+input,select,textarea{background:#FFFEFC;border-color:#D9CDBD}
+.visual-panel{margin:16px 0 0;border-radius:17px;overflow:hidden;height:126px;background:#E9E1D4;position:relative}
+.visual-panel img{width:100%;height:100%;object-fit:cover;display:block}
+.visual-panel:after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(55,31,47,.06))}
+.visual-panel.step2{height:135px;margin-top:18px}.visual-panel.step3{height:130px}.visual-panel.confirm{height:145px;margin-top:15px}
+.party-row{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:6px}
+.party-btn{height:47px;border:1px solid #D2C3B2;border-radius:12px;background:#fff;font:inherit;font-weight:700;color:var(--baran);cursor:pointer;padding:0}
+.party-btn.active{background:var(--baran);color:#fff;border-color:var(--baran)}
+.party-btn.wa-party{border-color:#8FA77B;color:#31542D;font-size:12px;line-height:1.05;display:flex;align-items:center;justify-content:center;gap:2px;flex-direction:column}
+.party-btn.wa-party .wa-dot{font-size:16px;line-height:1;color:#2E9D48}.party-btn.wa-party small{font-size:8px;font-weight:700}
+.section-title{display:flex;align-items:center;gap:8px;margin:18px 0 9px;font-size:14px;font-weight:700;color:var(--baran)}
+.section-title:first-child{margin-top:0}
+.date-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.date-row .pill{border-radius:11px;padding:10px 7px;text-align:center}
+.time-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.time-grid .pill{border-radius:11px;padding:9px 5px;text-align:center}
+.spaces{grid-template-columns:repeat(4,1fr);gap:7px}
+.space{text-align:center;padding:10px 5px;border-radius:13px;min-width:0}.space strong{font-size:12px}.space small{font-size:9px;line-height:1.2;display:block}.space-icon{font-size:23px;display:block;margin-bottom:5px;filter:grayscale(1);color:#58452C}
+.privacy-box{border:1px solid #E7DDCF;background:#F6F0E7}
+.identity-support{margin-top:14px}.identity-support .visual-panel{margin-bottom:0}
+.confirm-card{padding:18px}.success{padding:14px 0 7px}.success .icon{width:58px;height:58px}
+.summary div{background:#EEE3D2}
+.bday-grid{gap:8px}
+.decor-leaf{position:absolute;right:12px;top:108px;font-size:54px;color:rgba(163,82,67,.18);pointer-events:none;transform:rotate(-15deg)}
+@media(max-width:460px){
+ .main{padding:20px 18px 26px}.phone-grid{grid-template-columns:112px 1fr}.name-grid{grid-template-columns:1fr 1fr}
+ .party-row{gap:4px}.party-btn{height:44px;font-size:13px}.party-btn.wa-party{font-size:10px}
+ .date-row{grid-template-columns:repeat(2,1fr)}.time-grid{grid-template-columns:repeat(3,1fr)}
+ .spaces{grid-template-columns:repeat(2,1fr)}.visual-panel{height:112px}.visual-panel.step2{height:118px}
+}
+@media(max-width:350px){.party-row{grid-template-columns:repeat(4,1fr)}.phone-grid,.name-grid{grid-template-columns:1fr}.time-grid{grid-template-columns:repeat(2,1fr)}}
+
 </style>
 </head>
 <body>
@@ -118,11 +163,18 @@ textarea{min-height:84px;resize:vertical}
   </main>
 </div>
 
+<script src="baranblu-visual-config.js"></script>
 <script src="baranblu-api-adapter.js"></script>
 <script>
 (()=>{
 const app=document.getElementById("app");
 const prog=[...document.querySelectorAll("#progress span")];
+const VISUALS=Object.assign({
+  step1:"bb-reserva-cocina.jpg",
+  step2:"bb-reserva-ambiente.jpg",
+  step3:"bb-reserva-terraza.jpg",
+  confirmacion:"bb-reserva-confirmacion.jpg"
+},window.BARAN_BLU_VISUALS||{});
 
 const state={
   step:1,codigoPais:"+507",telefono:"",
@@ -194,24 +246,30 @@ function render(){
 function renderIdentidad(){
   app.innerHTML=`
     ${kicker("Reserva tu mesa")}
-    <p class="lead">Empecemos por tu número de teléfono. Si ya nos has visitado, podremos reconocerte y hacer tu reserva más rápida.</p>
+    <span class="decor-leaf">⌁</span>
+    <p class="lead">Empecemos con tu número de teléfono. Si ya nos has visitado, podremos reconocerte y hacer tu reserva más rápida.</p>
     <div class="card">
       <div class="phone-grid">
         <div class="field">
           <label>Código país</label>
-          <input id="codigoPais" value="${esc(state.codigoPais)}" inputmode="tel" placeholder="+507">
+          <input id="codigoPais" list="countryCodes" value="${esc(state.codigoPais)}" inputmode="tel" placeholder="+507">
+          <datalist id="countryCodes">
+            <option value="+507">Panamá</option><option value="+1">EE. UU. / Canadá</option><option value="+57">Colombia</option>
+            <option value="+34">España</option><option value="+52">México</option><option value="+506">Costa Rica</option>
+            <option value="+503">El Salvador</option><option value="+502">Guatemala</option><option value="+504">Honduras</option>
+          </datalist>
         </div>
         <div class="field">
           <label>Teléfono</label>
           <input id="telefono" value="${esc(state.telefono)}" inputmode="tel" placeholder="6000-1234">
         </div>
       </div>
-      <button class="btn" id="buscarBtn">${state.cargando?"Buscando...":"Continuar"}</button>
-      <div class="note">Aceptamos números internacionales. Ej.: +507, +1, +34, +57.</div>
+      <button class="btn" id="buscarBtn">${state.cargando?"Buscando...":"Continuar →"}</button>
       ${msg()}
       <div id="identityBox"></div>
     </div>
     <div class="privacy-box">Tus datos se utilizan únicamente para gestionar tu reserva y mejorar tu experiencia en Baran Blü. No vendemos ni compartimos tus datos con terceros para fines comerciales.</div>
+    <div class="identity-support"><div class="visual-panel"><img src="${esc(VISUALS.step1)}" alt="Cocina de la Tierra"></div></div>
   `;
   document.getElementById("buscarBtn").onclick=buscarTelefono;
   if(state.nombre || state.apellido || state.reconocido) mostrarIdentidad();
@@ -273,28 +331,36 @@ async function confirmarIdentidad(){
 function renderReserva(){
   const fechas=proximasFechas(6);
   if(!state.fecha && fechas[0]){state.fecha=fechas[0].v;state.fechaLabel=fechas[0].label;}
+  const iconos={Sala:"▱",Terraza:"☂",Booth:"▣",Bar:"▽"};
   app.innerHTML=`
     ${kicker("Elige tu reserva")}
-    <p class="lead">${state.reconocido?`¡Qué gusto verte de nuevo, ${esc(state.nombre)}! `:""}Selecciona personas, fecha, hora y espacio.</p>
+    <p class="lead">${state.reconocido?`¡Qué gusto verte de nuevo, ${esc(state.nombre)}! `:""}Selecciona personas, fecha, hora y el espacio que prefieres.</p>
     <div class="card">
-      <div class="field"><label>Número de personas</label>
-        <div class="pills">${[1,2,3,4,5,6].map(n=>`<button class="pill ${state.personas===n?"active":""}" data-p="${n}">${n}</button>`).join("")}</div>
+      <div class="section-title">¿Cuántas personas?</div>
+      <div class="party-row">
+        ${[1,2,3,4,5,6].map(n=>`<button class="party-btn ${state.personas===n?"active":""}" data-p="${n}">${n}</button>`).join("")}
+        <button class="party-btn wa-party" id="waParty" title="Grupos de 7 o más por WhatsApp"><span class="wa-dot">◉</span><span>7+</span><small>WhatsApp</small></button>
       </div>
-      <div class="field"><label>Fecha</label>
-        <div class="pills">${fechas.map(f=>`<button class="pill ${state.fecha===f.v?"active":""}" data-f="${f.v}" data-l="${f.label}">${f.label}</button>`).join("")}</div>
-      </div>
-      <div class="field"><label>Horario de llegada</label>
-        <div class="pills">${HORAS.map(h=>`<button class="pill ${state.hora===h?"active":""}" data-h="${h}">${h.replace("pm"," pm")}</button>`).join("")}</div>
-      </div>
-      <div class="field"><label>Espacio</label><div class="spaces" id="spaces">${Object.keys(ESPACIOS).map(k=>{
+
+      <div class="visual-panel step2"><img src="${esc(VISUALS.step2)}" alt="Ambiente de Baran Blü"></div>
+
+      <div class="section-title">Fecha</div>
+      <div class="date-row">${fechas.map(f=>`<button class="pill ${state.fecha===f.v?"active":""}" data-f="${f.v}" data-l="${f.label}">${f.label}</button>`).join("")}</div>
+
+      <div class="section-title">Horario de llegada</div>
+      <div class="time-grid">${HORAS.map(h=>`<button class="pill ${state.hora===h?"active":""}" data-h="${h}">${h.replace("pm"," pm")}</button>`).join("")}</div>
+
+      <div class="section-title">Espacio</div>
+      <div class="spaces" id="spaces">${Object.keys(ESPACIOS).map(k=>{
         const ok=state.disponibilidad[k]!==false;
-        return `<div class="space ${state.espacio===k?"active":""} ${ok?"":"off"}" data-s="${k}"><strong>${ESPACIOS[k][0]}</strong><small>${ok?ESPACIOS[k][1]:"Sin disponibilidad"}</small></div>`;
-      }).join("")}</div></div>
+        return `<div class="space ${state.espacio===k?"active":""} ${ok?"":"off"}" data-s="${k}"><span class="space-icon">${iconos[k]||"•"}</span><strong>${ESPACIOS[k][0]}</strong><small>${ok?ESPACIOS[k][1]:"Sin disponibilidad"}</small></div>`;
+      }).join("")}</div>
+
       ${msg()}
-      <button class="btn" id="next2" ${(!state.personas||!state.fecha||!state.hora||!state.espacio)?"disabled":""}>Continuar</button>
+      <button class="btn" id="next2" ${(!state.personas||!state.fecha||!state.hora||!state.espacio)?"disabled":""}>Continuar →</button>
       <button class="btn secondary" id="back2">Volver</button>
     </div>
-    <div class="wa">¿Grupo de 7 o más o una solicitud especial? <span class="link" id="waLink">Escríbenos por WhatsApp.</span></div>
+    <div class="visual-panel step3"><img src="${esc(VISUALS.step3)}" alt="Terraza de Baran Blü"></div>
   `;
   document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{state.personas=Number(b.dataset.p);state.espacio="";state.disponibilidad={};renderReserva();cargarDisponibilidad();});
   document.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{state.fecha=b.dataset.f;state.fechaLabel=b.dataset.l;state.espacio="";state.disponibilidad={};renderReserva();cargarDisponibilidad();});
@@ -302,8 +368,9 @@ function renderReserva(){
   document.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{if(!b.classList.contains("off")){state.espacio=b.dataset.s;renderReserva();}});
   document.getElementById("next2").onclick=()=>setStep(3);
   document.getElementById("back2").onclick=()=>setStep(1);
-  document.getElementById("waLink").onclick=()=>{
-    const n=String(state.whatsapp||"").replace(/\D/g,""); if(n) window.open(`https://wa.me/${n}`,"_blank");
+  document.getElementById("waParty").onclick=()=>{
+    const n=String(state.whatsapp||"").replace(/\D/g,"");
+    if(n) window.open(`https://wa.me/${n}?text=${encodeURIComponent("Hola, quisiera consultar una reserva para 7 o más personas en Baran Blü.")}`,"_blank");
   };
   if(state.personas&&state.fecha&&state.hora&&Object.keys(state.disponibilidad).length===0)cargarDisponibilidad();
 }
@@ -320,7 +387,7 @@ async function cargarDisponibilidad(){
 
 function renderDatos(){
   app.innerHTML=`
-    ${kicker("Completa tus datos")}
+    ${kicker("Tus datos")}
     <p class="lead">Solo pedimos la información necesaria para atender tu reserva.</p>
     <div class="card">
       <div class="field"><label>Correo electrónico *</label><input type="email" id="correo" value="${esc(state.correo)}" placeholder="tu@correo.com"></div>
@@ -442,7 +509,7 @@ function renderConfirmacion(){
       <h1>¡Reserva confirmada!</h1>
       <p class="lead">Gracias, ${esc(state.nombre)}. Tu mesa quedó registrada.</p>
     </div>
-    <div class="card">
+    <div class="card confirm-card">
       <div class="summary">
         <div><small>Código</small><strong>${esc(state.resultado&&state.resultado.id)}</strong></div>
         <div><small>Personas</small><strong>${state.personas}</strong></div>
@@ -452,6 +519,7 @@ function renderConfirmacion(){
       </div>
       <div class="note" style="margin-top:12px">Te enviamos la confirmación al correo registrado.</div>
       ${state.solicitarCumple?`<div class="alert ok">También enviamos tu solicitud de actualización de cumpleaños a Administración.</div>`:""}
+      <div class="visual-panel confirm"><img src="${esc(VISUALS.confirmacion)}" alt="Baran Blü"></div>
     </div>
   `;
 }
